@@ -52,15 +52,6 @@ Screens:
 - Deleting a list clears it as a destination from any other list that referenced it
 - New list creation immediately navigates to the new list (default name "New List")
 
-## TODOs — Not Yet Implemented
+## TODOs
 
-### Deferred Infrastructure
-- **Data persistence** — no local storage or database yet; all state is in-memory and lost on app restart
-- **Authentication** — no user accounts or auth; implement later
-
-### Deferred Features
-- **Item reordering** — drag-to-reorder active items within a list
-- **Undo on delete** — snackbar with undo when an item or list is deleted
-- **Clear checked items** — bulk action to delete all checked items at once
-- **List ordering** — drag-to-reorder lists on the Lists Screen
-- **Onboarding trigger logic** — currently Help popup is accessible only via Settings; decide when to auto-show (e.g. first launch only)
+See `context/PROGRESS.md` for the full list of bugs, deferred infrastructure, and deferred features with implementation notes.
