@@ -56,7 +56,7 @@ class _ListViewScreenState extends State<ListViewScreen> {
     widget.update(() {
       widget.appState.deleteList(widget.listId);
     });
-    Navigator.pop(context);
+    // Navigator.pop is handled by the null-list guard in build()
   }
 
   @override

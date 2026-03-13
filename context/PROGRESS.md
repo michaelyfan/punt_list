@@ -15,7 +15,7 @@ Tracks TODOs and implementation notes for PuntList.
 
 - [ ] **Item reordering** — drag-to-reorder active items within a list. Use a six-dot icon to convey the ability to drag. See `context/Reorder Item Example.png` for reference.
 
-- [ ] **Undo on delete** — snackbar with undo when an item or list is deleted
+- [ ] **Delete enhancements** — (1) a confirmation box before a list gets deleted, and (2) a snackbar with undo when a list is deleted. Item deletions don't need a confirmation or an undo. 
 
 - [ ] **Clear checked items** — Replace the current top-right delete button in the List View toolbar with a three-dot (⋮) button that opens a collapsible popup menu with two options:
   1. Delete list (existing behavior)
