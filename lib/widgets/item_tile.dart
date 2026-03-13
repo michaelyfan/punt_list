@@ -6,6 +6,8 @@ class ItemTile extends StatefulWidget {
   final PuntItem item;
   final String listId;
   final bool showMoveButton;
+  final bool showDragHandle;
+  final int itemIndex;
   final AppState appState;
   final void Function(VoidCallback) update;
 
@@ -14,6 +16,8 @@ class ItemTile extends StatefulWidget {
     required this.item,
     required this.listId,
     required this.showMoveButton,
+    this.showDragHandle = false,
+    this.itemIndex = 0,
     required this.appState,
     required this.update,
   });
@@ -86,6 +90,14 @@ class _ItemTileState extends State<ItemTile> {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Row(
           children: [
+            if (widget.showDragHandle)
+              ReorderableDragStartListener(
+                index: widget.itemIndex,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(Icons.drag_indicator, color: Colors.grey),
+                ),
+              ),
             Checkbox(
               value: isChecked,
               onChanged: (_) => widget.update(() {

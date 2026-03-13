@@ -52,6 +52,44 @@ Screens:
 - Deleting a list clears it as a destination from any other list that referenced it
 - New list creation immediately navigates to the new list (default name "New List")
 
+## Detailed UI Interaction Flows
+
+Concrete step-by-step flows derived from reading the source, useful for testing and automation.
+
+### Create a new list
+1. From Lists screen, tap the **"+"** FAB (bottom-right)
+2. App immediately navigates to the new list's List View screen, titled **"New List"**
+
+### Rename a list
+1. From List View screen, tap the **list name in the AppBar**
+2. A **"Rename List"** dialog appears — pre-filled text field, autofocused
+3. Clear and type the new name, then tap **"Save"** (or press Enter)
+4. AppBar title updates immediately; dialog closes
+
+### Add an item to a list
+1. From List View screen, tap the **"Add new item..."** text field at the bottom
+2. Type the item text and press **Enter/Return** (or tap the submit button)
+3. Item appears in the active items section; field clears and retains focus for next entry
+
+### Navigate back to Lists screen
+- Tap the **back arrow (←)** in the List View AppBar
+
+### Open Settings
+1. From the **Lists screen**, tap the **gear icon (⚙)** in the top-right of the AppBar
+2. Settings screen opens with Theme section and Move Settings section
+
+### Configure a move destination
+1. In Settings, scroll to the **"Move Settings"** section
+2. Each list has a card showing **"[List Name] moves to:"** with a **DropdownButton**
+3. Tap the dropdown for the source list; options are **"— No destination —"** plus all other lists
+4. Select a destination — change applies immediately, no save needed
+
+## Running
+
+```bash
+flutter run -d chrome
+```
+
 ## TODOs
 
 See `context/PROGRESS.md` for the full list of bugs, deferred infrastructure, and deferred features with implementation notes.

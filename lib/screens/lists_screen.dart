@@ -67,15 +67,21 @@ class ListsScreen extends StatelessWidget {
       ),
       body: appState.lists.isEmpty
           ? const Center(child: Text('No lists yet. Tap + to create one!'))
-          : ListView(
+          : ReorderableListView(
               padding: const EdgeInsets.only(top: 8),
-              children: appState.lists
-                  .map((list) => ListCard(
-                        key: ValueKey(list.id),
-                        list: list,
-                        onTap: () => _openList(context, list.id),
-                      ))
-                  .toList(),
+              buildDefaultDragHandles: false,
+              onReorder: (oldIndex, newIndex) => update(() {
+                appState.reorderList(oldIndex, newIndex);
+              }),
+              children: [
+                for (int i = 0; i < appState.lists.length; i++)
+                  ListCard(
+                    key: ValueKey(appState.lists[i].id),
+                    list: appState.lists[i],
+                    dragHandleIndex: i,
+                    onTap: () => _openList(context, appState.lists[i].id),
+                  ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _createList(context),

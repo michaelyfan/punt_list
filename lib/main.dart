@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'config.dart';
 import 'state/app_state.dart';
 import 'screens/lists_screen.dart';
 
@@ -14,7 +15,7 @@ class PuntApp extends StatefulWidget {
 }
 
 class _PuntAppState extends State<PuntApp> {
-  final AppState _appState = AppState();
+  final AppState _appState = seedTestData ? seedData() : AppState();
 
   void _update(VoidCallback fn) {
     setState(fn);

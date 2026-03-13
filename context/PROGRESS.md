@@ -13,16 +13,16 @@ Tracks TODOs and implementation notes for PuntList.
 
 ## Deferred Features
 
-- [ ] **Item reordering** — drag-to-reorder active items within a list. Use a six-dot icon to convey the ability to drag. See `context/Reorder Item Example.png` for reference.
+- [x] **Item reordering** — drag-to-reorder active items within a list. Use a six-dot icon to convey the ability to drag. See `context/Reorder Item Example.png` for reference.
 
-- [ ] **Delete enhancements** — (1) a confirmation box before a list gets deleted, and (2) a snackbar with undo when a list is deleted. Item deletions don't need a confirmation or an undo. 
+- [x] **Delete enhancements** — (1) a confirmation box before a list gets deleted, and (2) a snackbar with undo when a list is deleted. Item deletions don't need a confirmation or an undo.
 
-- [ ] **Clear checked items** — Replace the current top-right delete button in the List View toolbar with a three-dot (⋮) button that opens a collapsible popup menu with two options:
+- [x] **Clear checked items** — Replace the current top-right delete button in the List View toolbar with a three-dot (⋮) button that opens a collapsible popup menu with two options:
   1. Delete list (existing behavior)
   2. Clear checked items (asks for confirmation before acting)
   - Each menu item should show an icon + text label (not icon only)
 
-- [ ] **List ordering** — drag-to-reorder lists on the Lists Screen. Tap/click opens the list; drag triggers reorder.
+- [x] **List ordering** — drag-to-reorder lists on the Lists Screen. Tap/click opens the list; drag triggers reorder.
 
 - [ ] **Onboarding trigger logic** — currently Help popup is accessible only via Settings; decide when to auto-show (e.g. first launch only). *Skip for now.*
 

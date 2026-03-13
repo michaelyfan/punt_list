@@ -3,6 +3,8 @@ import '../state/app_state.dart';
 import '../widgets/item_tile.dart';
 import '../widgets/rename_list_dialog.dart';
 
+enum _ListAction { delete, clearChecked }
+
 class ListViewScreen extends StatefulWidget {
   final String listId;
   final AppState appState;
@@ -52,18 +54,74 @@ class _ListViewScreenState extends State<ListViewScreen> {
     }
   }
 
-  void _deleteList(BuildContext context) {
+  Future<void> _confirmDeleteList(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete list?'),
+        content: const Text('This will permanently delete the list and all its items.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Gather undo data before deletion
+    final index = widget.appState.lists.indexWhere((l) => l.id == widget.listId);
+    if (index == -1) return;
+    final list = widget.appState.lists[index];
+    final dependents = widget.appState.lists
+        .where((l) => l.destinationListId == widget.listId)
+        .map((l) => l.id)
+        .toList();
+
     widget.update(() {
       widget.appState.deleteList(widget.listId);
     });
+
+    // Show undo snackbar — ScaffoldMessenger persists across navigation
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('"${list.name}" deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            widget.update(() {
+              widget.appState.restoreList(list, index, dependents);
+            });
+          },
+        ),
+      ),
+    );
     // Navigator.pop is handled by the null-list guard in build()
+  }
+
+  Future<void> _confirmClearChecked(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Clear checked items?'),
+        content: const Text('All checked items will be removed from this list.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    widget.update(() {
+      widget.appState.clearCheckedItems(widget.listId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final list = widget.appState.lists
-        .cast()
-        .firstWhere((l) => l.id == widget.listId, orElse: () => null);
+    final matches = widget.appState.lists.where((l) => l.id == widget.listId);
+    final list = matches.isEmpty ? null : matches.first;
 
     if (list == null) {
       // List was deleted; pop on next frame
@@ -78,9 +136,9 @@ class _ListViewScreenState extends State<ListViewScreen> {
     final hasDestination = list.destinationListId != null;
     final destName = hasDestination
         ? widget.appState.lists
-            .cast()
-            .firstWhere((l) => l.id == list.destinationListId, orElse: () => null)
-            ?.name
+            .where((l) => l.id == list.destinationListId)
+            .map((l) => l.name)
+            .firstOrNull
         : null;
 
     return Scaffold(
@@ -90,9 +148,33 @@ class _ListViewScreenState extends State<ListViewScreen> {
           child: Text(list.name),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _deleteList(context),
+          PopupMenuButton<_ListAction>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) {
+              if (action == _ListAction.delete) {
+                _confirmDeleteList(context);
+              } else if (action == _ListAction.clearChecked) {
+                _confirmClearChecked(context);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ListAction.delete,
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Delete list'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _ListAction.clearChecked,
+                child: ListTile(
+                  leading: Icon(Icons.playlist_remove),
+                  title: Text('Clear checked items'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -128,27 +210,49 @@ class _ListViewScreenState extends State<ListViewScreen> {
           Expanded(
             child: activeItems.isEmpty && checkedItems.isEmpty
                 ? const Center(child: Text('No items yet. Add one below!'))
-                : ListView(
-                    padding: const EdgeInsets.only(top: 8, bottom: 8),
-                    children: [
-                      ...activeItems.map((item) => ItemTile(
-                            key: ValueKey(item.id),
-                            item: item,
-                            listId: widget.listId,
-                            showMoveButton: hasDestination,
-                            appState: widget.appState,
-                            update: widget.update,
-                          )),
+                : CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.only(top: 8),
+                        sliver: SliverReorderableList(
+                          itemCount: activeItems.length,
+                          onReorder: (oldIndex, newIndex) => widget.update(() {
+                            widget.appState.reorderItem(widget.listId, oldIndex, newIndex);
+                          }),
+                          itemBuilder: (context, index) {
+                            final item = activeItems[index];
+                            return ItemTile(
+                              key: ValueKey(item.id),
+                              item: item,
+                              listId: widget.listId,
+                              showMoveButton: hasDestination,
+                              showDragHandle: true,
+                              itemIndex: index,
+                              appState: widget.appState,
+                              update: widget.update,
+                            );
+                          },
+                        ),
+                      ),
                       if (activeItems.isNotEmpty && checkedItems.isNotEmpty)
-                        const Divider(indent: 16, endIndent: 16),
-                      ...checkedItems.map((item) => ItemTile(
-                            key: ValueKey(item.id),
-                            item: item,
-                            listId: widget.listId,
-                            showMoveButton: false,
-                            appState: widget.appState,
-                            update: widget.update,
-                          )),
+                        const SliverToBoxAdapter(
+                          child: Divider(indent: 16, endIndent: 16),
+                        ),
+                      SliverPadding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate(
+                            checkedItems.map((item) => ItemTile(
+                              key: ValueKey(item.id),
+                              item: item,
+                              listId: widget.listId,
+                              showMoveButton: false,
+                              appState: widget.appState,
+                              update: widget.update,
+                            )).toList(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
           ),
