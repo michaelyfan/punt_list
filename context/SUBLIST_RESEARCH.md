@@ -184,3 +184,23 @@ Work breakdown:
 4. Block-move logic in `reorderItem` for parent+children
 5. Enter-to-split editing behavior
 6. Checked propagation through parent → children
+
+---
+
+## Milestones
+
+### M1: Data model + basic rendering
+- Add `parentId` to `PuntItem`
+- Update `AppState` operations (delete cascades, `activeItems`/`checkedItems` become hierarchy-aware)
+- Render sub-items with left-padding indent
+- Checked propagation (parent check → all children check/uncheck)
+
+### M2: Gesture + editing
+- Pan gesture with axis-locking for horizontal swipe to indent/promote
+- Block-move in reorder (parent + children travel together, children collapse visually during drag)
+- Enter-to-split editing (replaces current "add to bottom" model)
+
+### M3: Sub-item punt
+- Ghost parent creation logic
+- Grouping subsequent punted children under existing ghost parent
+- Edge case handling (punt child then parent, ghost parent merges)
