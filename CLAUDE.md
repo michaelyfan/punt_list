@@ -105,5 +105,4 @@ flutter run -d chrome
 
 - [ ] **Onboarding trigger logic** — currently Help popup is accessible only via Settings; decide when to auto-show (e.g. first launch only). *Skip for now.*
 
-- [ ] **Sub-bullets** — See implementation notes below.
-  - [ ] **Sub-item move (→) behavior** — Sub-items currently cannot be moved via the → button. Decision needed: should tapping → on a sub-item move just that item (orphaning it from parent), move the parent+whole sublist, or be disabled entirely? Disabled for now.
+- [ ] **Sub-bullets** — See `context/SUBLIST_RESEARCH_AND_PROGRESS.md` for full design. M1 (data model + rendering) is implemented. M2 (gestures + editing) is implemented. M3 (sub-item punt with ghost parents) is pending.
