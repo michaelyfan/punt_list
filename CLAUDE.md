@@ -105,4 +105,4 @@ flutter run -d chrome
 
 - [ ] **Onboarding trigger logic** — currently Help popup is accessible only via Settings; decide when to auto-show (e.g. first launch only). *Skip for now.*
 
-- [ ] **Sub-bullets** — See `context/SUBLIST_RESEARCH_AND_PROGRESS.md` for full design. M1 (data model + rendering) is implemented. M2 (gestures + editing) is implemented. M3 (sub-item punt with ghost parents) is pending.
+- [x] **Sub-bullets** — Implemented: data model with `parentId`, indent/promote gestures, enter-to-split editing, checked propagation, ghost parents, sub-item punt

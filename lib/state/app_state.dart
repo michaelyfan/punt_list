@@ -89,6 +89,7 @@ class AppState {
   void reorderItem(String listId, int oldIndex, int newIndex) {
     final list = _findList(listId);
     if (list == null) return;
+    final rawNewIndex = newIndex;
     if (newIndex > oldIndex) newIndex--;
     if (oldIndex == newIndex) return;
 
@@ -96,10 +97,68 @@ class AppState {
     if (oldIndex >= displayItems.length || newIndex >= displayItems.length) return;
 
     final draggedItem = displayItems[oldIndex].item;
-    // Only root items can be dragged (sub-items have no drag handle)
-    if (draggedItem.parentId != null) return;
 
-    // Collect block: parent + its unchecked children
+    if (draggedItem.parentId != null) {
+      // --- Child item drag: move single child ---
+      list.items.removeWhere((i) => i.id == draggedItem.id);
+
+      // Recompute display without dragged item
+      final tempList = PuntList(id: 'temp', name: 'temp', items: List.from(list.items));
+      final newDisplay = tempList.activeDisplayItems;
+
+      // Determine new parent from item above drop position
+      String? newParentId;
+      if (newIndex > 0) {
+        final aboveIndex = (newIndex - 1).clamp(0, newDisplay.length - 1);
+        final aboveItem = newDisplay[aboveIndex].item;
+        newParentId = aboveItem.parentId ?? aboveItem.id;
+      }
+      // newIndex == 0: becomes root (newParentId stays null)
+
+      final movedItem = draggedItem.withParentId(newParentId);
+
+      // Insert at correct position in raw items
+      if (newIndex >= newDisplay.length) {
+        final lastActive = list.items.lastIndexWhere((i) => !i.isChecked);
+        list.items.insert(lastActive + 1, movedItem);
+      } else {
+        final targetItem = newDisplay[newIndex].item;
+        final targetIdx = list.items.indexWhere((i) => i.id == targetItem.id);
+        list.items.insert(targetIdx == -1 ? list.items.length : targetIdx, movedItem);
+      }
+      return;
+    }
+
+    // --- Root item drag: move parent + children block ---
+
+    // Compute block range in display list
+    int blockEnd = oldIndex;
+    for (int i = oldIndex + 1; i < displayItems.length; i++) {
+      if (displayItems[i].item.parentId == draggedItem.id) {
+        blockEnd = i;
+      } else {
+        break;
+      }
+    }
+    final blockSize = blockEnd - oldIndex + 1;
+
+    // No-op if dropping within own block
+    if (newIndex >= oldIndex && newIndex <= blockEnd) return;
+
+    // No-op if insertion would split another parent-child group
+    if (rawNewIndex > 0 && rawNewIndex < displayItems.length) {
+      final leftItem = displayItems[rawNewIndex - 1].item;
+      final rightItem = displayItems[rawNewIndex].item;
+      final leftGroup = leftItem.parentId ?? leftItem.id;
+      final rightGroup = rightItem.parentId ?? rightItem.id;
+      if (leftGroup == rightGroup) return;
+    }
+
+    // Adjust newIndex for block removal (line 92 only subtracted 1)
+    if (newIndex > blockEnd) {
+      newIndex -= (blockSize - 1);
+    }
+
     final blockIds = <String>{draggedItem.id};
     for (final item in list.items) {
       if (item.parentId == draggedItem.id && !item.isChecked) {
@@ -107,18 +166,14 @@ class AppState {
       }
     }
 
-    // Remove block from items, preserving order
     final block = list.items.where((i) => blockIds.contains(i.id)).toList();
     final remaining = list.items.where((i) => !blockIds.contains(i.id)).toList();
 
-    // Find insertion point: the display item at newIndex in the remaining items
-    // Recompute display without block to find where to insert
     final tempList = PuntList(id: 'temp', name: 'temp', items: remaining);
     final remainingDisplay = tempList.activeDisplayItems;
 
     int insertIndex;
     if (newIndex >= remainingDisplay.length) {
-      // Insert after all active items — find last active item position in remaining
       final lastActive = remaining.lastIndexWhere((i) => !i.isChecked);
       insertIndex = lastActive + 1;
     } else {
@@ -307,17 +362,43 @@ class AppState {
     final item = source.items[index];
 
     if (item.parentId != null) {
-      // Sub-item punt deferred to M3
+      // Sub-item punt: move child to destination, grouped under a duplicate parent
+      final parentIndex = source.items.indexWhere((i) => i.id == item.parentId);
+      if (parentIndex == -1) return;
+      final parent = source.items[parentIndex];
+
+      // Check if destination already has the parent (from a prior punt)
+      final existingParentIndex = dest.items.indexWhere((i) => i.id == parent.id);
+      if (existingParentIndex == -1) {
+        // Create duplicate parent in destination
+        dest.items.add(PuntItem(
+          id: parent.id,
+          text: parent.text,
+          parentId: null,
+        ));
+      }
+
+      // Remove from source and add to destination under the parent
+      source.items.removeAt(index);
+      dest.items.add(item.copyWith(isChecked: false));
       return;
     }
 
-    // Parent: move parent + all children as a block
+    // Parent punt: check if destination already has a duplicate (from prior child punts)
+    final existingIndex = dest.items.indexWhere((i) => i.id == itemId);
+
+    // Collect all children from source
     final children =
         source.items.where((i) => i.parentId == itemId).toList();
     source.items
         .removeWhere((i) => i.id == itemId || i.parentId == itemId);
-    // Parent is unchecked on punt; children preserve their checked state
-    dest.items.add(item.copyWith(isChecked: false));
+
+    if (existingIndex != -1) {
+      // Replace the duplicate parent with the real one
+      dest.items[existingIndex] = item.copyWith(isChecked: false);
+    } else {
+      dest.items.add(item.copyWith(isChecked: false));
+    }
     dest.items.addAll(children);
   }
 

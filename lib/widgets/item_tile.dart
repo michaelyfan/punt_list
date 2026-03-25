@@ -129,7 +129,7 @@ class _ItemTileState extends State<ItemTile> {
 
     Widget rowContent = Row(
       children: [
-        if (widget.showDragHandle && !widget.isSubItem && !isGhost)
+        if (widget.showDragHandle && !isGhost)
           ReorderableDragStartListener(
             index: widget.itemIndex,
             child: const Padding(
@@ -188,7 +188,7 @@ class _ItemTileState extends State<ItemTile> {
               widget.appState.deleteItem(widget.listId, widget.item.id);
             }),
           ),
-        if (widget.showMoveButton && !isChecked && !isGhost && !widget.isSubItem)
+        if (widget.showMoveButton && !isChecked && !isGhost)
           IconButton(
             icon: const Icon(Icons.arrow_forward),
             style: IconButton.styleFrom(
