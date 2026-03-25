@@ -46,11 +46,49 @@ Screens:
 | Tap item text | Opens inline text field to edit item |
 | Uncheck a checked item | Moves it back to active (top) section |
 | Checked items | Cannot be moved via the → arrow |
+| Swipe item right | Indents item as child of item above (root items only) |
+| Swipe item left | Promotes child to root, adopting later siblings as its children |
+| Press Enter while editing | Splits item at cursor into two items |
 
 ## Behaviors
 
 - Deleting a list clears it as a destination from any other list that referenced it
 - New list creation immediately navigates to the new list (default name "New List")
+
+## Sub-items (Sublists)
+
+Items support one level of nesting via `parentId` on `PuntItem`. Sub-items are visually indented 48px.
+
+### Data Model
+- `PuntItem.parentId`: `null` = top-level root item, non-null = child of that parent
+- `PuntItem.withParentId(String?)`: returns a copy with a new parentId (used by indent/promote)
+- `DisplayItem`: wrapper used for rendering — holds the `PuntItem` plus `isGhostParent` flag and `isSubItem` getter
+- `PuntList.activeDisplayItems` / `checkedDisplayItems`: hierarchy-aware display lists that group parents with their children
+
+### Indent & Promote (Swipe Gestures)
+- **Indent** (swipe right, 60px threshold): converts a root item into a child of the item above it. The item and all its children are reparented and repositioned after the new parent's last child.
+- **Promote** (swipe left, 60px threshold): converts a child into a root item. Later siblings of the promoted item become children of the promoted item. The promoted block is inserted after the old parent's block.
+- Only active (unchecked), non-ghost items can be swiped.
+
+### Enter-to-Split Editing
+- Pressing Enter while editing an item splits the text at the cursor position. The current item keeps text before the cursor; a new item is created with text after the cursor. The new item inherits the same `parentId` and receives auto-focus.
+
+### Checked Propagation
+- **Checking a parent**: cascades check to all children
+- **Unchecking a child**: also unchecks the parent (Google Keep "incomplete" behavior)
+- **Ghost parents**: when a parent is unchecked but has checked children, the parent appears in the checked section as a "ghost" — displayed with disabled styling, non-interactive checkbox, no drag handle, no delete/move buttons
+
+### Reordering (Drag)
+- Root items drag as a block with their children
+- Dragging a block cannot split another parent-child group
+- Child items can be dragged individually and reparent based on the item above the drop position
+
+### Punt (Move) with Sub-items
+- **Punting a sub-item**: moves the child to the destination list, creating a duplicate parent shell in the destination if one doesn't already exist (matched by parent's original ID)
+- **Punting a parent**: moves the parent and all its children to the destination. If a duplicate parent already exists in the destination (from prior child punts), replaces it with the real parent
+
+### Delete with Sub-items
+- Deleting a parent cascades: removes the parent and all its children
 
 ## Detailed UI Interaction Flows
 
@@ -105,5 +143,4 @@ flutter run -d chrome
 
 - [ ] **Onboarding trigger logic** — currently Help popup is accessible only via Settings; decide when to auto-show (e.g. first launch only). *Skip for now.*
 
-- [ ] **Sub-bullets** — See implementation notes below.
-  - [ ] **Sub-item move (→) behavior** — Sub-items currently cannot be moved via the → button. Decision needed: should tapping → on a sub-item move just that item (orphaning it from parent), move the parent+whole sublist, or be disabled entirely? Disabled for now.
+- [x] **Sub-bullets** — Implemented: data model with `parentId`, indent/promote gestures, enter-to-split editing, checked propagation, ghost parents, sub-item punt

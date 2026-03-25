@@ -24,6 +24,7 @@ class ListViewScreen extends StatefulWidget {
 class _ListViewScreenState extends State<ListViewScreen> {
   final TextEditingController _addController = TextEditingController();
   final FocusNode _addFocusNode = FocusNode();
+  String? _autoFocusItemId;
 
   @override
   void dispose() {
@@ -131,8 +132,8 @@ class _ListViewScreenState extends State<ListViewScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
 
-    final activeItems = list.activeItems;
-    final checkedItems = list.checkedItems;
+    final activeItems = list.activeDisplayItems;
+    final checkedItems = list.checkedDisplayItems;
     final hasDestination = list.destinationListId != null;
     final destName = hasDestination
         ? widget.appState.lists
@@ -220,7 +221,30 @@ class _ListViewScreenState extends State<ListViewScreen> {
                             widget.appState.reorderItem(widget.listId, oldIndex, newIndex);
                           }),
                           itemBuilder: (context, index) {
-                            final item = activeItems[index];
+                            final displayItem = activeItems[index];
+                            final item = displayItem.item;
+
+                            // Compute canIndent: root item, not first in display list
+                            bool canIndent = false;
+                            String? indentTargetParentId;
+                            if (item.parentId == null && index > 0) {
+                              final above = activeItems[index - 1].item;
+                              indentTargetParentId = above.parentId ?? above.id;
+                              canIndent = true;
+                            }
+
+                            final canPromote = item.parentId != null;
+
+                            final shouldAutoFocus = _autoFocusItemId == item.id;
+                            if (shouldAutoFocus) {
+                              // Clear after this build
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (_autoFocusItemId == item.id) {
+                                  setState(() => _autoFocusItemId = null);
+                                }
+                              });
+                            }
+
                             return ItemTile(
                               key: ValueKey(item.id),
                               item: item,
@@ -230,6 +254,30 @@ class _ListViewScreenState extends State<ListViewScreen> {
                               itemIndex: index,
                               appState: widget.appState,
                               update: widget.update,
+                              isSubItem: displayItem.isSubItem,
+                              canIndent: canIndent,
+                              canPromote: canPromote,
+                              indentTargetParentId: indentTargetParentId,
+                              autoFocus: shouldAutoFocus,
+                              onIndent: (itemId, targetParentId) {
+                                widget.update(() {
+                                  widget.appState.indentItem(
+                                      widget.listId, itemId, targetParentId);
+                                });
+                              },
+                              onPromote: (itemId) {
+                                widget.update(() {
+                                  widget.appState.promoteItem(
+                                      widget.listId, itemId);
+                                });
+                              },
+                              onSplit: (itemId, beforeText, afterText) {
+                                widget.update(() {
+                                  final newId = widget.appState.splitItem(
+                                      widget.listId, itemId, beforeText, afterText);
+                                  _autoFocusItemId = newId;
+                                });
+                              },
                             );
                           },
                         ),
@@ -242,13 +290,15 @@ class _ListViewScreenState extends State<ListViewScreen> {
                         padding: const EdgeInsets.only(bottom: 8),
                         sliver: SliverList(
                           delegate: SliverChildListDelegate(
-                            checkedItems.map((item) => ItemTile(
-                              key: ValueKey(item.id),
-                              item: item,
+                            checkedItems.map((displayItem) => ItemTile(
+                              key: ValueKey('${displayItem.item.id}${displayItem.isGhostParent ? '-ghost' : ''}'),
+                              item: displayItem.item,
                               listId: widget.listId,
                               showMoveButton: false,
                               appState: widget.appState,
                               update: widget.update,
+                              isSubItem: displayItem.isSubItem,
+                              isGhostParent: displayItem.isGhostParent,
                             )).toList(),
                           ),
                         ),
