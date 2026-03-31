@@ -47,7 +47,7 @@ linked_*.ds
 unlinked.ds
 unlinked_spec.ds
 
-# Firebase config (contains API keys)
+# Firebase config
 google-services.json
 GoogleService-Info.plist
 **/firebase_options.dart
