@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../state/app_state.dart';
 import '../widgets/destination_dropdown.dart';
 import '../widgets/help_dialog.dart';
@@ -114,6 +115,42 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                 )),
+
+          const SizedBox(height: 24),
+
+          // Account section
+          Text('Account', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Sign out'),
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Sign out?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  await AuthService().signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                }
+              },
+            ),
+          ),
         ],
       ),
     );

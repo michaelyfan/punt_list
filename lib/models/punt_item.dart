@@ -28,4 +28,19 @@ class PuntItem {
       parentId: newParentId,
     );
   }
+
+  /// Serialize to a Firestore-compatible map (excludes id, sortOrder, timestamps).
+  Map<String, dynamic> toMap() => {
+        'text': text,
+        'isChecked': isChecked,
+        'parentId': parentId,
+      };
+
+  /// Deserialize from a Firestore document snapshot.
+  factory PuntItem.fromMap(String id, Map<String, dynamic> data) => PuntItem(
+        id: id,
+        text: data['text'] as String? ?? '',
+        isChecked: data['isChecked'] as bool? ?? false,
+        parentId: data['parentId'] as String?,
+      );
 }
