@@ -22,6 +22,19 @@ class PuntList {
     this.destinationListId,
   }) : items = items ?? [];
 
+  /// Serialize to a Firestore-compatible map (excludes id, items, timestamps).
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'destinationListId': destinationListId,
+      };
+
+  /// Deserialize from a Firestore document snapshot (items loaded separately).
+  factory PuntList.fromMap(String id, Map<String, dynamic> data) => PuntList(
+        id: id,
+        name: data['name'] as String? ?? '',
+        destinationListId: data['destinationListId'] as String?,
+      );
+
   bool hasChildren(String itemId) =>
       items.any((i) => i.parentId == itemId);
 
