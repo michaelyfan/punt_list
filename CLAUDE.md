@@ -23,6 +23,31 @@ The following files are gitignored but **required** to build and run locally. Th
 
 If these are missing, run `flutterfire configure` with access to the Firebase project `punt-list`.
 
+## Tests
+
+Widget tests exercise user flows by rendering real widgets and simulating interactions. No Firebase or mocking is needed — `AppState` works without Firestore (all persistence calls are null-guarded), so tests construct screens directly with test data.
+
+```bash
+flutter test          # run all widget tests
+```
+
+### Test structure
+
+| File | What it tests |
+|------|---------------|
+| `test/helpers/test_helpers.dart` | Factories (`makeItem`, `makeList`, `createTestAppState`) and pump helpers |
+| `test/screens/lists_screen_test.dart` | Empty state, list display, create/open list, navigate to settings |
+| `test/screens/list_view_screen_test.dart` | Add/check/uncheck/delete/punt items, parent-child cascading, inline edit, rename/delete list, ghost parents |
+| `test/widgets/item_tile_test.dart` | Swipe indent/promote, enter-to-split, ghost parent rendering, sub-item indent, move button visibility |
+| `test/screens/settings_screen_test.dart` | Theme toggle, destination dropdown config, help dialog |
+
+### Writing new tests
+
+- Use `createTestAppState(lists: [...])` to build state with test data (no Firestore, no init).
+- Use `pumpScreen(tester, widget)` to wrap in `MaterialApp` for simple tests.
+- Use `pumpStatefulScreen(tester, builder: (update) => widget)` when the test needs UI to rebuild after state changes (the `update` callback triggers `setState`).
+- Use `testUpdate` as the update callback when you only need to verify state changes, not UI updates.
+
 ## App Concept
 
 - Users create multiple named lists
@@ -194,9 +219,7 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
 
 ## TODOs
 
-### Firebase Console Setup (blocking)
-- [ ] Enable auth providers (Email/Password, Google) in Firebase Console > Authentication > Sign-in method
-- [ ] Enable Cloud Firestore in Firebase Console > Firestore Database > Create database
+### Firebase Console Setup
 - [ ] Deploy security rules: `firebase deploy --only firestore:rules`
 - [ ] Android Google Sign-In: add SHA-1 fingerprint in Project Settings > Your apps
 - [ ] Transition Firestore from dev/test mode to production mode
@@ -207,3 +230,11 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
 - [ ] Error feedback for failed Firestore writes (currently fire-and-forget)
+- [ ] Integration tests against Firebase Emulator Suite (removed — previously used Chrome/chromedriver via `flutter drive`). Platform options for re-implementation:
+  - **macOS desktop** (`flutter test integration_test -d macos`): no chromedriver, each test file runs independently, but requires full Xcode; CI macOS runners cost 10x minutes
+  - **Linux desktop** (`flutter test integration_test -d linux`): cheapest CI (Linux runners, 1x minutes), but needs `ninja-build`/`libgtk-3-dev` and adds a platform target you don't ship
+  - **Chrome** (`flutter drive -d chrome`): chromedriver is pre-installed and version-matched on GitHub Actions Linux runners, so CI is cheap; locally chromedriver version mismatches are annoying
+  - **Hybrid**: macOS desktop locally for dev ease, Chrome on CI for cost (recommended)
+  - macOS needs `com.apple.security.network.client` in `DebugProfile.entitlements` for emulator HTTP calls
+  - Android emulator is heaviest setup and flakiest; iOS simulator has same 10x CI cost as macOS
+- [ ] Pipeline including all tests
