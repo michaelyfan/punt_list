@@ -242,7 +242,7 @@ void main() {
       expect(appState.lists.first.items, isEmpty);
     });
 
-    testWidgets('rename list via title tap', (tester) async {
+    testWidgets('rename list via menu', (tester) async {
       final list = makeList(id: 'list-1', name: 'Old Name');
       final appState = createTestAppState(lists: [list]);
       await pumpScreen(
@@ -250,8 +250,10 @@ void main() {
         ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
       );
 
-      // Tap the title to open rename dialog
-      await tester.tap(find.text('Old Name'));
+      // Open the popup menu and tap "Rename list"
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename list'));
       await tester.pumpAndSettle();
 
       // Dialog should appear with current name
@@ -267,6 +269,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(appState.lists.first.name, 'New Name');
+    });
+
+    testWidgets('rename list caps name at 200 characters', (tester) async {
+      final list = makeList(id: 'list-1', name: 'Old Name');
+      final appState = createTestAppState(lists: [list]);
+      await pumpScreen(
+        tester,
+        ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename list'));
+      await tester.pumpAndSettle();
+
+      final dialogTextField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      final longName = 'a' * 600;
+      await tester.enterText(dialogTextField, longName);
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(appState.lists.first.name.length, 200);
+      expect(appState.lists.first.name, 'a' * 200);
     });
 
     testWidgets('delete list via menu and confirm', (tester) async {
@@ -391,8 +419,31 @@ void main() {
       // The first TextField is the inline edit, the last is the "add item" field
       await tester.enterText(textFields.first, 'Updated');
 
-      // Tap elsewhere to unfocus and commit
-      await tester.tap(find.text('Test')); // tap the app bar title area
+      // Unfocus to commit the edit
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+
+      expect(appState.lists.first.items.first.text, 'Updated');
+    });
+
+    testWidgets('tapping outside inline edit blurs and commits', (tester) async {
+      final item = makeItem(id: 'i1', text: 'Original');
+      final list = makeList(id: 'list-1', name: 'Test', items: [item]);
+      final appState = createTestAppState(lists: [list]);
+      await pumpScreen(
+        tester,
+        ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
+      );
+
+      await tester.tap(find.text('Original'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'Updated');
+      await tester.pump();
+
+      // Tap on the AppBar (outside the TextField's TapRegion) to trigger
+      // onTapOutside, which unfocuses and commits the edit.
+      await tester.tapAt(const Offset(400, 28));
       await tester.pumpAndSettle();
 
       expect(appState.lists.first.items.first.text, 'Updated');

@@ -62,6 +62,7 @@ class _AddItemsDialogState extends State<AddItemsDialog> {
             keyboardType: TextInputType.multiline,
             maxLines: null,
             minLines: 1,
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             decoration: const InputDecoration(
               hintText: 'Add new item...',
               border: OutlineInputBorder(),

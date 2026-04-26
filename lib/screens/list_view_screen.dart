@@ -4,7 +4,7 @@ import '../widgets/add_items_dialog.dart';
 import '../widgets/item_tile.dart';
 import '../widgets/rename_list_dialog.dart';
 
-enum _ListAction { delete, clearChecked }
+enum _ListAction { rename, delete, clearChecked }
 
 class ListViewScreen extends StatefulWidget {
   final String listId;
@@ -36,7 +36,10 @@ class _ListViewScreenState extends State<ListViewScreen> {
     });
   }
 
-  Future<void> _showRenameDialog(BuildContext context, String currentName) async {
+  Future<void> _showRenameDialog(
+    BuildContext context,
+    String currentName,
+  ) async {
     final newName = await showDialog<String>(
       context: context,
       builder: (_) => RenameListDialog(currentName: currentName),
@@ -54,17 +57,27 @@ class _ListViewScreenState extends State<ListViewScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete list?'),
-        content: const Text('This will permanently delete the list and all its items.'),
+        content: const Text(
+          'This will permanently delete the list and all its items.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
 
     // Gather undo data before deletion
-    final index = widget.appState.lists.indexWhere((l) => l.id == widget.listId);
+    final index = widget.appState.lists.indexWhere(
+      (l) => l.id == widget.listId,
+    );
     if (index == -1) return;
     final list = widget.appState.lists[index];
     final dependents = widget.appState.lists
@@ -99,10 +112,18 @@ class _ListViewScreenState extends State<ListViewScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Clear checked items?'),
-        content: const Text('All checked items will be removed from this list.'),
+        content: const Text(
+          'All checked items will be removed from this list.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear'),
+          ),
         ],
       ),
     );
@@ -130,17 +151,14 @@ class _ListViewScreenState extends State<ListViewScreen> {
     final hasDestination = list.destinationListId != null;
     final destName = hasDestination
         ? widget.appState.lists
-            .where((l) => l.id == list.destinationListId)
-            .map((l) => l.name)
-            .firstOrNull
+              .where((l) => l.id == list.destinationListId)
+              .map((l) => l.name)
+              .firstOrNull
         : null;
 
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: () => _showRenameDialog(context, list.name),
-          child: Text(list.name),
-        ),
+        title: Text(list.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -150,13 +168,23 @@ class _ListViewScreenState extends State<ListViewScreen> {
           PopupMenuButton<_ListAction>(
             icon: const Icon(Icons.more_vert),
             onSelected: (action) {
-              if (action == _ListAction.delete) {
+              if (action == _ListAction.rename) {
+                _showRenameDialog(context, list.name);
+              } else if (action == _ListAction.delete) {
                 _confirmDeleteList(context);
               } else if (action == _ListAction.clearChecked) {
                 _confirmClearChecked(context);
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ListAction.rename,
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Rename list'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 value: _ListAction.delete,
                 child: ListTile(
@@ -180,132 +208,161 @@ class _ListViewScreenState extends State<ListViewScreen> {
       body: Column(
         children: [
           // Destination banner
-          if (destName != null)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+            if (destName != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-              ),
-              child: Text.rich(
-                TextSpan(
-                  text: 'Tap → to move items to ',
-                  children: [
-                    TextSpan(
-                      text: destName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.4),
+                  ),
                 ),
-              ),
-            ),
-
-          // Items list
-          Expanded(
-            child: activeItems.isEmpty && checkedItems.isEmpty
-                ? const Center(child: Text('No items yet. Tap + to add one.'))
-                : CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.only(top: 8),
-                        sliver: SliverReorderableList(
-                          itemCount: activeItems.length,
-                          onReorder: (oldIndex, newIndex) => widget.update(() {
-                            widget.appState.reorderItem(widget.listId, oldIndex, newIndex);
-                          }),
-                          itemBuilder: (context, index) {
-                            final displayItem = activeItems[index];
-                            final item = displayItem.item;
-
-                            // Compute canIndent: root item, not first in display list
-                            bool canIndent = false;
-                            String? indentTargetParentId;
-                            if (item.parentId == null && index > 0) {
-                              final above = activeItems[index - 1].item;
-                              indentTargetParentId = above.parentId ?? above.id;
-                              canIndent = true;
-                            }
-
-                            final canPromote = item.parentId != null;
-
-                            final shouldAutoFocus = _autoFocusItemId == item.id;
-                            if (shouldAutoFocus) {
-                              // Clear after this build
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (_autoFocusItemId == item.id) {
-                                  setState(() => _autoFocusItemId = null);
-                                }
-                              });
-                            }
-
-                            return ItemTile(
-                              key: ValueKey(item.id),
-                              item: item,
-                              listId: widget.listId,
-                              showMoveButton: hasDestination,
-                              showDragHandle: true,
-                              itemIndex: index,
-                              appState: widget.appState,
-                              update: widget.update,
-                              isSubItem: displayItem.isSubItem,
-                              canIndent: canIndent,
-                              canPromote: canPromote,
-                              indentTargetParentId: indentTargetParentId,
-                              autoFocus: shouldAutoFocus,
-                              onIndent: (itemId, targetParentId) {
-                                widget.update(() {
-                                  widget.appState.indentItem(
-                                      widget.listId, itemId, targetParentId);
-                                });
-                              },
-                              onPromote: (itemId) {
-                                widget.update(() {
-                                  widget.appState.promoteItem(
-                                      widget.listId, itemId);
-                                });
-                              },
-                              onSplit: (itemId, beforeText, afterText) {
-                                widget.update(() {
-                                  final newId = widget.appState.splitItem(
-                                      widget.listId, itemId, beforeText, afterText);
-                                  _autoFocusItemId = newId;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      if (activeItems.isNotEmpty && checkedItems.isNotEmpty)
-                        const SliverToBoxAdapter(
-                          child: Divider(indent: 16, endIndent: 16),
-                        ),
-                      SliverPadding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        sliver: SliverList(
-                          delegate: SliverChildListDelegate(
-                            checkedItems.map((displayItem) => ItemTile(
-                              key: ValueKey('${displayItem.item.id}${displayItem.isGhostParent ? '-ghost' : ''}'),
-                              item: displayItem.item,
-                              listId: widget.listId,
-                              showMoveButton: false,
-                              appState: widget.appState,
-                              update: widget.update,
-                              isSubItem: displayItem.isSubItem,
-                              isGhostParent: displayItem.isGhostParent,
-                            )).toList(),
-                          ),
-                        ),
+                child: Text.rich(
+                  TextSpan(
+                    text: 'Tap → to move items to ',
+                    children: [
+                      TextSpan(
+                        text: destName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-          ),
-        ],
-      ),
-    );
+                ),
+              ),
+
+            // Items list
+            Expanded(
+              child: activeItems.isEmpty && checkedItems.isEmpty
+                  ? const Center(child: Text('No items yet. Tap + to add one.'))
+                  : CustomScrollView(
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.only(top: 8),
+                          sliver: SliverReorderableList(
+                            itemCount: activeItems.length,
+                            onReorder: (oldIndex, newIndex) =>
+                                widget.update(() {
+                                  widget.appState.reorderItem(
+                                    widget.listId,
+                                    oldIndex,
+                                    newIndex,
+                                  );
+                                }),
+                            itemBuilder: (context, index) {
+                              final displayItem = activeItems[index];
+                              final item = displayItem.item;
+
+                              // Compute canIndent: root item, not first in display list
+                              bool canIndent = false;
+                              String? indentTargetParentId;
+                              if (item.parentId == null && index > 0) {
+                                final above = activeItems[index - 1].item;
+                                indentTargetParentId =
+                                    above.parentId ?? above.id;
+                                canIndent = true;
+                              }
+
+                              final canPromote = item.parentId != null;
+
+                              final shouldAutoFocus =
+                                  _autoFocusItemId == item.id;
+                              if (shouldAutoFocus) {
+                                // Clear after this build
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (_autoFocusItemId == item.id) {
+                                    setState(() => _autoFocusItemId = null);
+                                  }
+                                });
+                              }
+
+                              return ItemTile(
+                                key: ValueKey(item.id),
+                                item: item,
+                                listId: widget.listId,
+                                showMoveButton: hasDestination,
+                                showDragHandle: true,
+                                itemIndex: index,
+                                appState: widget.appState,
+                                update: widget.update,
+                                isSubItem: displayItem.isSubItem,
+                                canIndent: canIndent,
+                                canPromote: canPromote,
+                                indentTargetParentId: indentTargetParentId,
+                                autoFocus: shouldAutoFocus,
+                                onIndent: (itemId, targetParentId) {
+                                  widget.update(() {
+                                    widget.appState.indentItem(
+                                      widget.listId,
+                                      itemId,
+                                      targetParentId,
+                                    );
+                                  });
+                                },
+                                onPromote: (itemId) {
+                                  widget.update(() {
+                                    widget.appState.promoteItem(
+                                      widget.listId,
+                                      itemId,
+                                    );
+                                  });
+                                },
+                                onSplit: (itemId, beforeText, afterText) {
+                                  widget.update(() {
+                                    final newId = widget.appState.splitItem(
+                                      widget.listId,
+                                      itemId,
+                                      beforeText,
+                                      afterText,
+                                    );
+                                    _autoFocusItemId = newId;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        if (activeItems.isNotEmpty && checkedItems.isNotEmpty)
+                          const SliverToBoxAdapter(
+                            child: Divider(indent: 16, endIndent: 16),
+                          ),
+                        SliverPadding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          sliver: SliverList(
+                            delegate: SliverChildListDelegate(
+                              checkedItems
+                                  .map(
+                                    (displayItem) => ItemTile(
+                                      key: ValueKey(
+                                        '${displayItem.item.id}${displayItem.isGhostParent ? '-ghost' : ''}',
+                                      ),
+                                      item: displayItem.item,
+                                      listId: widget.listId,
+                                      showMoveButton: false,
+                                      appState: widget.appState,
+                                      update: widget.update,
+                                      isSubItem: displayItem.isSubItem,
+                                      isGhostParent: displayItem.isGhostParent,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      );
   }
 }

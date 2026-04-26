@@ -47,7 +47,9 @@ class _RenameListDialogState extends State<RenameListDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
+        maxLength: 200,
         onSubmitted: (_) => _save(),
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
         decoration: const InputDecoration(border: OutlineInputBorder()),
       ),
       actions: [

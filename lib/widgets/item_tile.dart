@@ -159,6 +159,7 @@ class _ItemTileState extends State<ItemTile> {
                       controller: _controller,
                       focusNode: _focusNode,
                       onSubmitted: (_) => _handleSplit(),
+                      onTapOutside: (_) => _focusNode.unfocus(),
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         isDense: true,
