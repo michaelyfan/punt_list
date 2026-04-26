@@ -23,6 +23,14 @@ The following files are gitignored but **required** to build and run locally. Th
 
 If these are missing, run `flutterfire configure` with access to the Firebase project `punt-list`.
 
+## Verification protocol
+
+At the end of every change, verify the work:
+
+1. Confirm the code builds — at minimum `flutter analyze`; run `flutter build <target>` for changes that touch platform code.
+2. Run `flutter test`. The suite is described under [Tests](#tests) below; if you add tests, list them there too. Note for future agents: if the suite is empty (no `test/` files), say so explicitly instead of skipping the step.
+3. Ask the user to validate manually with `flutter run -d chrome` and call out the specific flows to exercise.
+
 ## Tests
 
 Widget tests exercise user flows by rendering real widgets and simulating interactions. No Firebase or mocking is needed — `AppState` works without Firestore (all persistence calls are null-guarded), so tests construct screens directly with test data.
@@ -221,12 +229,11 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
 
 ### Firebase Console Setup
 - [ ] Deploy security rules: `firebase deploy --only firestore:rules`
-- [ ] Android Google Sign-In: add SHA-1 fingerprint in Project Settings > Your apps
+- [x] Android Google Sign-In: debug keystore SHA-1 registered. No release keystore configured — `flutter build apk --release` falls back to the debug key, so the debug SHA-1 covers release installs too. Revisit if a real release keystore or Play App Signing is set up.
 - [ ] Transition Firestore from dev/test mode to production mode
 
 ### Deferred
 - [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show
-- [ ] Reasonable limits for lists, items, and item text length
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
 - [ ] Error feedback for failed Firestore writes (currently fire-and-forget)
@@ -238,3 +245,16 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
   - macOS needs `com.apple.security.network.client` in `DebugProfile.entitlements` for emulator HTTP calls
   - Android emulator is heaviest setup and flakiest; iOS simulator has same 10x CI cost as macOS
 - [ ] Pipeline including all tests
+
+### UX
+- [ ] No way to deselect the add-item input — provide a way to dismiss/blur it
+- [ ] No way to deselect item edit — provide a way to dismiss/blur it
+- [ ] Move "Rename list" into the same menu as "Delete list"
+
+### Limits
+- [ ] Enforce 500-character limit for list names
+- [ ] Enforce 20,000-character total limit per list (decide detection strategy: sum of item text including sub-items; check on add/edit)
+
+### Docs / Process
+- [ ] Condense CLAUDE.md; move system-design decisions to a separate doc under a new `docs/` folder
+- [ ] Document each major folder with its own CLAUDE.md (include notes such as item-reordering data strategy)

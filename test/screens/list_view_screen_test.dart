@@ -25,42 +25,101 @@ void main() {
         ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
       );
 
-      expect(find.text('No items yet. Add one below!'), findsOneWidget);
+      expect(find.text('No items yet. Tap + to add one.'), findsOneWidget);
     });
 
-    testWidgets('add item via text field and submit', (tester) async {
+    testWidgets('add item via + button dialog', (tester) async {
       final list = makeList(id: 'list-1', name: 'Test');
       final appState = createTestAppState(lists: [list]);
       await pumpStatefulScreen(tester, builder: (update) =>
         ListViewScreen(listId: 'list-1', appState: appState, update: update),
       );
 
-      await tester.enterText(find.byType(TextField), 'Buy milk');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'Buy milk');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
       await tester.pumpAndSettle();
 
       expect(appState.lists.first.items.length, 1);
       expect(find.text('Buy milk'), findsOneWidget);
     });
 
-    testWidgets('add multiple items', (tester) async {
+    testWidgets('add multiple items via repeated dialog', (tester) async {
       final list = makeList(id: 'list-1', name: 'Test');
       final appState = createTestAppState(lists: [list]);
       await pumpStatefulScreen(tester, builder: (update) =>
         ListViewScreen(listId: 'list-1', appState: appState, update: update),
       );
 
-      await tester.enterText(find.byType(TextField).last, 'Item A');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+      Future<void> addOne(String text) async {
+        await tester.tap(find.byIcon(Icons.add));
+        await tester.pumpAndSettle();
+        final dialogField = find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        );
+        await tester.enterText(dialogField, text);
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+        await tester.pumpAndSettle();
+      }
 
-      await tester.enterText(find.byType(TextField).last, 'Item B');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+      await addOne('Item A');
+      await addOne('Item B');
 
       expect(appState.lists.first.items.length, 2);
       expect(find.text('Item A'), findsOneWidget);
       expect(find.text('Item B'), findsOneWidget);
+    });
+
+    testWidgets('multiline input creates one item per line and shows hint', (tester) async {
+      final list = makeList(id: 'list-1', name: 'Test');
+      final appState = createTestAppState(lists: [list]);
+      await pumpStatefulScreen(tester, builder: (update) =>
+        ListViewScreen(listId: 'list-1', appState: appState, update: update),
+      );
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'a\nb\n\nc');
+      await tester.pumpAndSettle();
+
+      // Hint visible while multi-line input is present
+      expect(find.text('Line breaks will become different items.'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      final items = appState.lists.first.items;
+      expect(items.length, 3);
+      expect(items[0].text, 'a');
+      expect(items[1].text, 'b');
+      expect(items[2].text, 'c');
+    });
+
+    testWidgets('empty submit is a no-op', (tester) async {
+      final list = makeList(id: 'list-1', name: 'Test');
+      final appState = createTestAppState(lists: [list]);
+      await pumpStatefulScreen(tester, builder: (update) =>
+        ListViewScreen(listId: 'list-1', appState: appState, update: update),
+      );
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(appState.lists.first.items, isEmpty);
     });
 
     testWidgets('check item moves it to checked section', (tester) async {

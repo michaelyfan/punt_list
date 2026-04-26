@@ -161,6 +161,16 @@ class AppState {
     _persistListItems(listId);
   }
 
+  void addItems(String listId, List<String> texts) {
+    if (texts.isEmpty) return;
+    final list = _findList(listId);
+    if (list == null) return;
+    for (final text in texts) {
+      list.items.add(PuntItem(id: _generateId(), text: text));
+    }
+    _persistListItems(listId);
+  }
+
   void reorderItem(String listId, int oldIndex, int newIndex) {
     final list = _findList(listId);
     if (list == null) return;
