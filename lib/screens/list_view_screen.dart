@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../state/app_state.dart';
+import '../widgets/add_items_dialog.dart';
 import '../widgets/item_tile.dart';
 import '../widgets/rename_list_dialog.dart';
 
@@ -22,25 +23,17 @@ class ListViewScreen extends StatefulWidget {
 }
 
 class _ListViewScreenState extends State<ListViewScreen> {
-  final TextEditingController _addController = TextEditingController();
-  final FocusNode _addFocusNode = FocusNode();
   String? _autoFocusItemId;
 
-  @override
-  void dispose() {
-    _addController.dispose();
-    _addFocusNode.dispose();
-    super.dispose();
-  }
-
-  void _addItem() {
-    final text = _addController.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _showAddItemsDialog(BuildContext context) async {
+    final lines = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => const AddItemsDialog(),
+    );
+    if (lines == null || lines.isEmpty) return;
     widget.update(() {
-      widget.appState.addItem(widget.listId, text);
+      widget.appState.addItems(widget.listId, lines);
     });
-    _addController.clear();
-    _addFocusNode.requestFocus();
   }
 
   Future<void> _showRenameDialog(BuildContext context, String currentName) async {
@@ -149,6 +142,11 @@ class _ListViewScreenState extends State<ListViewScreen> {
           child: Text(list.name),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Add items',
+            onPressed: () => _showAddItemsDialog(context),
+          ),
           PopupMenuButton<_ListAction>(
             icon: const Icon(Icons.more_vert),
             onSelected: (action) {
@@ -210,7 +208,7 @@ class _ListViewScreenState extends State<ListViewScreen> {
           // Items list
           Expanded(
             child: activeItems.isEmpty && checkedItems.isEmpty
-                ? const Center(child: Text('No items yet. Add one below!'))
+                ? const Center(child: Text('No items yet. Tap + to add one.'))
                 : CustomScrollView(
                     slivers: [
                       SliverPadding(
@@ -305,33 +303,6 @@ class _ListViewScreenState extends State<ListViewScreen> {
                       ),
                     ],
                   ),
-          ),
-
-          // Add item input
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              12,
-              8,
-              12,
-              MediaQuery.of(context).viewInsets.bottom + 12,
-            ),
-            child: TextField(
-              controller: _addController,
-              focusNode: _addFocusNode,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _addItem(),
-              decoration: InputDecoration(
-                hintText: 'Add new item...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-              ),
-            ),
           ),
         ],
       ),
