@@ -228,15 +228,29 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
 ## TODOs
 
 ### Firebase Console Setup
-- [ ] Deploy security rules: `firebase deploy --only firestore:rules`
+- [x] Deploy security rules: `firebase deploy --only firestore:rules`
 - [x] Android Google Sign-In: debug keystore SHA-1 registered. No release keystore configured — `flutter build apk --release` falls back to the debug key, so the debug SHA-1 covers release installs too. Revisit if a real release keystore or Play App Signing is set up.
 - [ ] Transition Firestore from dev/test mode to production mode
+- [x] Resolve Test Mode expiration (resolved by deploying user-scoped rules — see note)
+
+#### Test Mode expiration
+
+see below email transcript
+
+"""
+Subject: [Firebase] Client access to your Cloud Firestore database expiring in 2 day(s)
+	
+
+You chose to start developing in Test Mode, which leaves your Cloud Firestore database completely open to the Internet. Because your app is vulnerable to attackers, your Firestore security rules were configured to stop allowing requests after the first 30 days.
+
+In 2 day(s), all client requests to your Firestore database will be denied. Before that time, please write strong security rules that allow your app to function while appropriately protecting your data. Analysis is run daily; if you've modified your rules in the last 24 hours those changes may not be accounted for.
+"""
 
 ### Deferred
 - [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
-- [ ] Error feedback for failed Firestore writes (currently fire-and-forget)
+- [ ] Error feedback for failed Firestore writes (currently fire-and-forget) — draft plan in `ERROR_FEEDBACK.md`; review/refine that instead of starting a new plan
 - [ ] Integration tests against Firebase Emulator Suite (removed — previously used Chrome/chromedriver via `flutter drive`). Platform options for re-implementation:
   - **macOS desktop** (`flutter test integration_test -d macos`): no chromedriver, each test file runs independently, but requires full Xcode; CI macOS runners cost 10x minutes
   - **Linux desktop** (`flutter test integration_test -d linux`): cheapest CI (Linux runners, 1x minutes), but needs `ninja-build`/`libgtk-3-dev` and adds a platform target you don't ship
@@ -247,12 +261,12 @@ User-scoped isolation on all paths (`request.auth.uid == userId`). No complex ru
 - [ ] Pipeline including all tests
 
 ### UX
-- [ ] No way to deselect the add-item input — provide a way to dismiss/blur it
-- [ ] No way to deselect item edit — provide a way to dismiss/blur it
-- [ ] Move "Rename list" into the same menu as "Delete list"
+- [x] No way to deselect the add-item input — `onTapOutside` on the `AddItemsDialog` `TextField` (and the rename dialog) blurs the field on tap outside
+- [x] No way to deselect item edit — `onTapOutside` on the inline `TextField` in `ItemTile` blurs and commits via the focus listener
+- [x] Move "Rename list" into the same menu as "Delete list"
 
 ### Limits
-- [ ] Enforce 500-character limit for list names
+- [x] Enforce 200-character limit for list names (enforced via `maxLength: 200` on the rename dialog `TextField`)
 - [ ] Enforce 20,000-character total limit per list (decide detection strategy: sum of item text including sub-items; check on add/edit)
 
 ### Docs / Process
