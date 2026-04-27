@@ -154,21 +154,34 @@ class AppState {
 
   // ── Items ─────────────────────────────────────────────────────────
 
-  void addItem(String listId, String text) {
-    final id = _generateId();
-    _findList(listId)?.items.add(PuntItem(id: id, text: text));
-
+  /// Returns false if the list's [PuntList.characterLimit] would be exceeded;
+  /// in that case the item is not added.
+  bool addItem(String listId, String text) {
+    final list = _findList(listId);
+    if (list == null) return false;
+    if (list.totalCharacters + text.length > PuntList.characterLimit) {
+      return false;
+    }
+    list.items.add(PuntItem(id: _generateId(), text: text));
     _persistListItems(listId);
+    return true;
   }
 
-  void addItems(String listId, List<String> texts) {
-    if (texts.isEmpty) return;
+  /// Adds all [texts] atomically. Returns false (and adds nothing) if doing so
+  /// would exceed the list's [PuntList.characterLimit].
+  bool addItems(String listId, List<String> texts) {
+    if (texts.isEmpty) return true;
     final list = _findList(listId);
-    if (list == null) return;
+    if (list == null) return false;
+    final added = texts.fold<int>(0, (sum, t) => sum + t.length);
+    if (list.totalCharacters + added > PuntList.characterLimit) {
+      return false;
+    }
     for (final text in texts) {
       list.items.add(PuntItem(id: _generateId(), text: text));
     }
     _persistListItems(listId);
+    return true;
   }
 
   void reorderItem(String listId, int oldIndex, int newIndex) {
@@ -444,36 +457,54 @@ class AppState {
     _firestore?.batchUpdateItems(listId, updates);
   }
 
-  void editItemText(String listId, String itemId, String newText) {
+  /// Returns false if growing this item's text would push the list past
+  /// [PuntList.characterLimit]; in that case the edit is not applied.
+  bool editItemText(String listId, String itemId, String newText) {
     final list = _findList(listId);
-    if (list == null) return;
+    if (list == null) return false;
     final index = list.items.indexWhere((i) => i.id == itemId);
-    if (index == -1) return;
+    if (index == -1) return false;
+    final delta = newText.length - list.items[index].text.length;
+    if (delta > 0 &&
+        list.totalCharacters + delta > PuntList.characterLimit) {
+      return false;
+    }
     list.items[index] = list.items[index].copyWith(text: newText);
 
     _firestore?.updateItem(listId, itemId, {'text': newText});
+    return true;
   }
 
-  void moveItem(String sourceListId, String itemId) {
+  /// Returns false if the destination list cannot fit the moved item(s)
+  /// without exceeding [PuntList.characterLimit]; in that case nothing moves.
+  bool moveItem(String sourceListId, String itemId) {
     final source = _findList(sourceListId);
-    if (source == null || source.destinationListId == null) return;
+    if (source == null || source.destinationListId == null) return false;
     final dest = _findList(source.destinationListId!);
-    if (dest == null) return;
+    if (dest == null) return false;
     final destListId = source.destinationListId!;
 
     final index = source.items.indexWhere((i) => i.id == itemId);
-    if (index == -1) return;
+    if (index == -1) return false;
     final item = source.items[index];
 
     if (item.parentId != null) {
       // Sub-item punt
       final parentIndex =
           source.items.indexWhere((i) => i.id == item.parentId);
-      if (parentIndex == -1) return;
+      if (parentIndex == -1) return false;
       final parent = source.items[parentIndex];
 
       final existingParentIndex =
           dest.items.indexWhere((i) => i.id == parent.id);
+      // Destination grows by the child's text, plus the parent's text if a
+      // ghost shell needs to be created.
+      final addedChars = item.text.length +
+          (existingParentIndex == -1 ? parent.text.length : 0);
+      if (dest.totalCharacters + addedChars > PuntList.characterLimit) {
+        return false;
+      }
+
       if (existingParentIndex == -1) {
         dest.items
             .add(PuntItem(id: parent.id, text: parent.text, parentId: null));
@@ -488,7 +519,7 @@ class AppState {
         destListId: destListId,
         destItems: List.from(dest.items),
       );
-      return;
+      return true;
     }
 
     // Parent punt
@@ -497,6 +528,16 @@ class AppState {
     final removedIds = [itemId, ...children.map((c) => c.id)];
 
     final existingIndex = dest.items.indexWhere((i) => i.id == itemId);
+    // Destination grows by the children's text plus the parent's text, but a
+    // pre-existing ghost shell with the same id is replaced (so its text
+    // doesn't double-count).
+    final addedChars = item.text.length +
+        children.fold<int>(0, (sum, c) => sum + c.text.length) -
+        (existingIndex != -1 ? dest.items[existingIndex].text.length : 0);
+    if (dest.totalCharacters + addedChars > PuntList.characterLimit) {
+      return false;
+    }
+
     source.items
         .removeWhere((i) => i.id == itemId || i.parentId == itemId);
 
@@ -513,6 +554,7 @@ class AppState {
       destListId: destListId,
       destItems: List.from(dest.items),
     );
+    return true;
   }
 
   // ── Theme ─────────────────────────────────────────────────────────

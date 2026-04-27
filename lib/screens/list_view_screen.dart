@@ -26,14 +26,21 @@ class _ListViewScreenState extends State<ListViewScreen> {
   String? _autoFocusItemId;
 
   Future<void> _showAddItemsDialog(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     final lines = await showDialog<List<String>>(
       context: context,
       builder: (_) => const AddItemsDialog(),
     );
     if (lines == null || lines.isEmpty) return;
+    bool added = false;
     widget.update(() {
-      widget.appState.addItems(widget.listId, lines);
+      added = widget.appState.addItems(widget.listId, lines);
     });
+    if (!added) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('List is full (20,000-character limit reached).'),
+      ));
+    }
   }
 
   Future<void> _showRenameDialog(
