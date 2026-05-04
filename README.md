@@ -21,17 +21,6 @@ A list app that lets you move items between lists with one tap. Built with Flutt
 flutter run -d chrome
 ```
 
-<<<<<<< Updated upstream
-## Tests
-
-Widget tests cover core user flows — creating lists, adding/checking/punting items, swipe gestures (indent/promote), inline editing, settings, and parent-child cascading behavior. Tests render real widgets and simulate taps, drags, and text input without requiring Firebase.
-
-```bash
-flutter test                                    # run all tests
-flutter test test/screens/                      # run all screen tests
-flutter test test/widgets/item_tile_test.dart   # run a single test file
-```
-=======
 ### Android
 
 1. Start an Android emulator from Android Studio's Device Manager (or `flutter emulators --launch <id>`), or connect a physical device with USB debugging enabled.
@@ -89,4 +78,13 @@ The app stays on the phone after the install command finishes and works offline 
 - **Signing key**: with no release keystore configured, `flutter build apk --release` falls back to the debug keystore. That means the debug SHA-1 registered above is sufficient for Google Sign-In to keep working. If you later configure a real release keystore (or publish to Play Store, where Play App Signing rotates the key), add that new SHA-1 to Firebase.
 - **Reinstalling**: running `flutter install` again overwrites the existing app. App data is preserved as long as the signing key is unchanged.
 - **No hot reload**: a release-installed app runs disconnected from `flutter` tooling — for iterative development use `flutter run` instead.
->>>>>>> Stashed changes
+
+## Tests
+
+Widget tests cover core user flows — creating lists, adding/checking/punting items, swipe gestures (indent/promote), inline editing, settings, and parent-child cascading behavior. Tests render real widgets and simulate taps, drags, and text input without requiring Firebase.
+
+```bash
+flutter test                                    # run all tests
+flutter test test/screens/                      # run all screen tests
+flutter test test/widgets/item_tile_test.dart   # run a single test file
+```
