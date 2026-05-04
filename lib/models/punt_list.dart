@@ -10,10 +10,18 @@ class DisplayItem {
 }
 
 class PuntList {
+  /// Maximum total character count across all item text in a single list.
+  static const int characterLimit = 20000;
+
   final String id;
   String name;
   final List<PuntItem> items;
   String? destinationListId;
+
+  /// Sum of `text` length across every item (parents and sub-items, checked
+  /// or not). Used to enforce [characterLimit].
+  int get totalCharacters =>
+      items.fold(0, (sum, i) => sum + i.text.length);
 
   PuntList({
     required this.id,

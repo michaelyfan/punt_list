@@ -98,14 +98,27 @@ class _ItemTileState extends State<ItemTile> {
   void _commitEdit() {
     final text = _controller.text.trim();
     if (text.isNotEmpty && text != widget.item.text) {
+      bool ok = true;
       widget.update(() {
-        widget.appState.editItemText(widget.listId, widget.item.id, text);
+        ok = widget.appState
+            .editItemText(widget.listId, widget.item.id, text);
       });
+      if (!ok) {
+        _controller.text = widget.item.text;
+        _showLimitReached();
+      }
     } else {
       // Restore original text if empty or unchanged
       _controller.text = widget.item.text;
     }
     setState(() => _isEditing = false);
+  }
+
+  void _showLimitReached() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('List is full (20,000-character limit reached).'),
+    ));
   }
 
   void _handleSplit() {
@@ -197,9 +210,14 @@ class _ItemTileState extends State<ItemTile> {
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
               shape: const CircleBorder(),
             ),
-            onPressed: () => widget.update(() {
-              widget.appState.moveItem(widget.listId, widget.item.id);
-            }),
+            onPressed: () {
+              bool ok = true;
+              widget.update(() {
+                ok = widget.appState
+                    .moveItem(widget.listId, widget.item.id);
+              });
+              if (!ok) _showLimitReached();
+            },
           ),
       ],
     );
