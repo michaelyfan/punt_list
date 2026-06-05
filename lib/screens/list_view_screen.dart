@@ -101,6 +101,8 @@ class _ListViewScreenState extends State<ListViewScreen> {
     messenger.showSnackBar(
       SnackBar(
         content: Text('"${list.name}" deleted'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () {
