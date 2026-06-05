@@ -163,7 +163,6 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 ### Deferred
 - [ ] Unified design language and full app redesign
 - [ ] Official app icon
-- [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show. Draft plan in `ONBOARDING_TRIGGER.md` (auto-show `HelpDialog` once per user, gated by an `onboardingCompleted` flag in user preferences); review/refine that instead of starting a new plan
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
 - [x] Error feedback for failed Firestore writes (was fire-and-forget). `AppState` now has a public `onError` callback; a `_report(Future?)` helper wraps every `_firestore?.…` write and forwards permanent failures to `onError` (transient offline errors — `unavailable`/`deadline-exceeded` — are filtered out, since the SDK queues and retries those). `main.dart` wires `onError` to a global `ScaffoldMessenger` (`scaffoldMessengerKey`), showing a generic, 4s-debounced SnackBar. Null-guard preserved so Firestore-less tests still pass. Tested in `test/state/app_state_error_test.dart`; design noted in `docs/backend.md` and `ERROR_FEEDBACK.md`.
