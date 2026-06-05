@@ -15,7 +15,7 @@ void main() {
       expect(find.text('No lists yet. Tap + to create one!'), findsOneWidget);
     });
 
-    testWidgets('shows all lists with names and item counts', (tester) async {
+    testWidgets('shows all lists with names and item previews', (tester) async {
       final appState = createTestAppState(lists: [
         makeList(name: 'Groceries', items: [
           makeItem(text: 'Milk'),
@@ -29,12 +29,26 @@ void main() {
       ]);
       await pumpScreen(tester, ListsScreen(appState: appState, update: testUpdate));
 
+      // Preview shows active item texts joined; checked items are excluded.
       expect(find.text('Groceries'), findsOneWidget);
-      expect(find.text('2 active, 1 completed'), findsOneWidget);
+      expect(find.text('Milk · Eggs'), findsOneWidget);
+      // Empty list shows "No items".
       expect(find.text('Work'), findsOneWidget);
       expect(find.text('No items'), findsOneWidget);
       expect(find.text('Ideas'), findsOneWidget);
-      expect(find.text('1 active'), findsOneWidget);
+      expect(find.text('Idea 1'), findsOneWidget);
+    });
+
+    testWidgets('shows "All done" when every item is checked', (tester) async {
+      final appState = createTestAppState(lists: [
+        makeList(name: 'Chores', items: [
+          makeItem(text: 'Sweep', isChecked: true),
+          makeItem(text: 'Mop', isChecked: true),
+        ]),
+      ]);
+      await pumpScreen(tester, ListsScreen(appState: appState, update: testUpdate));
+
+      expect(find.text('All done'), findsOneWidget);
     });
 
     testWidgets('tap FAB creates new list and navigates to it', (tester) async {

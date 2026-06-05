@@ -10,18 +10,21 @@ class ListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = list.activeItems.length;
-    final checked = list.checkedItems.length;
+    // Preview of the list's contents: the active (unchecked) item texts in
+    // order, joined into a single line. Falls back to a status string when
+    // there's nothing meaningful to preview.
+    final activeTexts = list.activeItems
+        .map((i) => i.text.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
 
     String subtitle;
-    if (active == 0 && checked == 0) {
+    if (list.items.isEmpty) {
       subtitle = 'No items';
-    } else if (checked == 0) {
-      subtitle = '$active active';
-    } else if (active == 0) {
-      subtitle = '$checked completed';
+    } else if (activeTexts.isEmpty) {
+      subtitle = 'All done';
     } else {
-      subtitle = '$active active, $checked completed';
+      subtitle = activeTexts.join(' · ');
     }
 
     final handle = dragHandleIndex != null
@@ -38,7 +41,11 @@ class ListCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: ListTile(
         title: Text(list.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: handle,
         onTap: onTap,
       ),

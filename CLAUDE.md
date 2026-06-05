@@ -176,7 +176,7 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 
 ### General
 - [ ] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input
-- [ ] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items)
+- [x] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items). `ListCard` subtitle now shows the active (unchecked) item texts joined by " · " on a single ellipsized line; falls back to "No items" (empty list) or "All done" (everything checked). Tested in `lists_screen_test.dart`.
 - [ ] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open
 - [ ] Remove the trash icon — Backspace on an empty item should delete it instead. if you press backspace and you're at the beginning of the text but the item still has characters, it gets prepended to the previous item. Does not apply to parents of sub-lists.
 - [ ] Punt button is too bright, loud, and big — tone it down (color/size)
