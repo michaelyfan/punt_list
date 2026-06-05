@@ -347,6 +347,30 @@ void main() {
       expect(appState.lists.first.items.first.text, 'Active');
     });
 
+    testWidgets('uncheck all items via menu', (tester) async {
+      final items = [
+        makeItem(id: 'i1', text: 'Active'),
+        makeItem(id: 'i2', text: 'Done', isChecked: true),
+        makeItem(id: 'i3', text: 'Also done', isChecked: true),
+      ];
+      final list = makeList(id: 'list-1', name: 'Test', items: items);
+      final appState = createTestAppState(lists: [list]);
+      await pumpScreen(
+        tester,
+        ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Uncheck all items'));
+      await tester.pumpAndSettle();
+
+      // All items remain, none are checked
+      expect(appState.lists.first.items.length, 3);
+      expect(appState.lists.first.items.every((i) => !i.isChecked), true);
+    });
+
     testWidgets('checking parent cascades to children', (tester) async {
       final parent = makeItem(id: 'p1', text: 'Parent');
       final child1 = makeItem(id: 'c1', text: 'Child 1', parentId: 'p1');

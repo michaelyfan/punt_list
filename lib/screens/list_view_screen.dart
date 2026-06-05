@@ -4,7 +4,7 @@ import '../widgets/add_items_dialog.dart';
 import '../widgets/item_tile.dart';
 import '../widgets/rename_list_dialog.dart';
 
-enum _ListAction { rename, delete, clearChecked }
+enum _ListAction { rename, delete, clearChecked, uncheckAll }
 
 class ListViewScreen extends StatefulWidget {
   final String listId;
@@ -181,6 +181,10 @@ class _ListViewScreenState extends State<ListViewScreen> {
                 _confirmDeleteList(context);
               } else if (action == _ListAction.clearChecked) {
                 _confirmClearChecked(context);
+              } else if (action == _ListAction.uncheckAll) {
+                widget.update(() {
+                  widget.appState.uncheckAllItems(widget.listId);
+                });
               }
             },
             itemBuilder: (_) => const [
@@ -197,6 +201,14 @@ class _ListViewScreenState extends State<ListViewScreen> {
                 child: ListTile(
                   leading: Icon(Icons.delete_outline),
                   title: Text('Delete list'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _ListAction.uncheckAll,
+                child: ListTile(
+                  leading: Icon(Icons.check_box_outline_blank),
+                  title: Text('Uncheck all items'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),

@@ -421,6 +421,22 @@ class AppState {
     _firestore?.deleteItems(listId, checkedIds);
   }
 
+  void uncheckAllItems(String listId) {
+    final list = _findList(listId);
+    if (list == null) return;
+
+    final updates = <String, Map<String, dynamic>>{};
+    for (int i = 0; i < list.items.length; i++) {
+      if (list.items[i].isChecked) {
+        list.items[i] = list.items[i].copyWith(isChecked: false);
+        updates[list.items[i].id] = {'isChecked': false};
+      }
+    }
+    if (updates.isEmpty) return;
+
+    _firestore?.batchUpdateItems(listId, updates);
+  }
+
   void toggleItem(String listId, String itemId) {
     final list = _findList(listId);
     if (list == null) return;

@@ -156,6 +156,8 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 - [ ] Transition Firestore from dev/test mode to production mode
 
 ### Deferred
+- [ ] Unified design language and full app redesign
+- [ ] Official app icon
 - [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show. Draft plan in `ONBOARDING_TRIGGER.md` (auto-show `HelpDialog` once per user, gated by an `onboardingCompleted` flag in user preferences); review/refine that instead of starting a new plan
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
@@ -171,6 +173,18 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 
 ### Limits
 - [x] Enforce 20,000-character total limit per list. Strategy: sum of `text` length across all items (parents + sub-items, checked + unchecked). Gated in `AppState.addItem`/`addItems`/`editItemText`/`moveItem` (return `false` and no-op when over); UI shows a SnackBar via `list_view_screen` and `item_tile`. `splitItem` is unchanged (split is text-preserving).
+
+### General
+- [ ] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input
+- [ ] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items)
+- [ ] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open
+- [ ] Remove the trash icon — Backspace on an empty item should delete it instead. if you press backspace and you're at the beginning of the text but the item still has characters, it gets prepended to the previous item. Does not apply to parents of sub-lists.
+- [ ] Punt button is too bright, loud, and big — tone it down (color/size)
+- [ ] Change the official app name (as shown in the phone's app menu) to "Punt List"
+- [x] Add "Uncheck all items" to the three-dot menu. `AppState.uncheckAllItems` clears `isChecked` on all items and fires a surgical `batchUpdateItems` (no reorder — order is unchanged); wired into the `ListViewScreen` popup menu (no confirm dialog, since it's non-destructive). Tested in `list_view_screen_test.dart`.
+- [ ] enable or validate Google sign in
+- [ ] pressing enter after an item creates a new item after it, which is expected. however, pressing 
+- [ ] document and/or code-consolidate all our logic related to enter/backspace on items (both as root items and as sublists)
 
 ### Docs / Process
 - [x] Condense CLAUDE.md; moved Backend Architecture rationale (why-Firebase, data model, design decisions, auth flow) to `docs/backend.md`. CLAUDE.md keeps a short stub + the Key Files table.
