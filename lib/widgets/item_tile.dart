@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../models/punt_item.dart';
 import '../state/app_state.dart';
 
@@ -20,11 +19,14 @@ class ItemTile extends StatefulWidget {
   final void Function(String itemId)? onPromote;
   final void Function(String itemId, String beforeText, String afterText)? onSplit;
 
-  /// Called when Backspace is pressed while the editor caret is at offset 0.
-  /// The screen decides whether to delete this (empty) item or merge it into
-  /// the previous one. Returns true if the tile should stop editing (an
-  /// operation occurred and focus moved elsewhere), false to let the default
-  /// TextField behavior proceed.
+  /// Called when Backspace is pressed while the editor caret is at the logical
+  /// start of the text (offset 0). The screen decides whether to delete this
+  /// (empty) item or merge it into the previous one. Returns true if an
+  /// operation occurred (this item went away and focus moved elsewhere), false
+  /// for a no-op (e.g. first item) so the editor restores its start state.
+  ///
+  /// Detection is sentinel-based rather than key-event-based so it works on
+  /// mobile soft keyboards — see [editStartSentinel].
   final bool Function(String itemId)? onBackspaceAtStart;
 
   final bool autoFocus;
@@ -63,6 +65,14 @@ class ItemTile extends StatefulWidget {
     this.sharedEditFocusNode,
   });
 
+  /// Zero-width space prepended to the edit buffer so that a Backspace pressed
+  /// at the logical start of the text produces a *detectable* edit (the
+  /// sentinel is deleted) instead of a no-op. This is what makes
+  /// Backspace-at-start work on mobile soft keyboards, which deliver edits as
+  /// text deltas rather than raw key events. Never persisted to the model —
+  /// stripped on read (see `_logicalText`).
+  static const String editStartSentinel = '\u200B';
+
   @override
   State<ItemTile> createState() => _ItemTileState();
 }
@@ -73,6 +83,24 @@ class _ItemTileState extends State<ItemTile> {
   FocusNode? _ownFocusNode;
   double _swipeOffset = 0;
   static const _swipeThreshold = 60.0;
+
+  /// Guards `_controller` mutations we make ourselves (rebuilding the sentinel
+  /// buffer) so `_onControllerChanged` doesn't treat them as user edits.
+  bool _mutatingBuffer = false;
+
+  /// Whether this tile uses the zero-width-space sentinel for Backspace-at-start
+  /// detection. Only when a handler is wired (the real app); isolated widget
+  /// tests that don't pass `onBackspaceAtStart` edit plain text.
+  bool get _usesSentinel => widget.onBackspaceAtStart != null;
+
+  /// The user-visible text in the editor, with the sentinel stripped.
+  String get _logicalText {
+    final t = _controller.text;
+    if (_usesSentinel && t.startsWith(ItemTile.editStartSentinel)) {
+      return t.substring(ItemTile.editStartSentinel.length);
+    }
+    return t;
+  }
 
   /// The node bound to this tile's TextField. Prefers the screen-shared node
   /// so focus survives split transitions; falls back to an internal node.
@@ -94,10 +122,30 @@ class _ItemTileState extends State<ItemTile> {
     }
   }
 
+  /// Watches the edit buffer for the sentinel disappearing from the front,
+  /// which a Backspace at the logical start produces (the user deleted the
+  /// sentinel). On a real soft keyboard this is the only reliable signal —
+  /// there is no raw key event to observe.
+  void _onControllerChanged() {
+    if (_mutatingBuffer || !_isEditing || !_usesSentinel) return;
+    final text = _controller.text;
+    if (text.startsWith(ItemTile.editStartSentinel)) return; // sentinel intact
+
+    if (text.contains(ItemTile.editStartSentinel)) {
+      // The user typed *before* the sentinel (caret at absolute 0). Pull the
+      // sentinel back to the front so start-detection keeps working.
+      _renormalizeBuffer();
+    } else {
+      // Sentinel was deleted → Backspace at the logical start of the text.
+      _handleBackspaceAtStart();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.item.text);
+    _controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChange);
     if (widget.autoFocus) {
       _isEditing = true;
@@ -121,18 +169,63 @@ class _ItemTileState extends State<ItemTile> {
     }
   }
 
-  /// Requests focus and positions the caret at [ItemTile.autoFocusCursorOffset]
-  /// (clamped to the current text length).
+  /// Requests focus and (re)builds the edit buffer with the caret at
+  /// [ItemTile.autoFocusCursorOffset].
   void _applyAutoFocus() {
     if (!mounted) return;
     _focusNode.requestFocus();
-    final offset =
-        widget.autoFocusCursorOffset.clamp(0, _controller.text.length);
-    _controller.selection = TextSelection.collapsed(offset: offset);
+    _setBuffer(widget.item.text, widget.autoFocusCursorOffset);
+  }
+
+  /// Installs [content] into the controller — sentinel-prefixed when this tile
+  /// uses sentinel detection — and places the caret at the logical [caret]
+  /// offset (clamped to the content length). Self-mutations are flagged so
+  /// `_onControllerChanged` ignores them.
+  void _setBuffer(String content, int caret) {
+    final offset = caret.clamp(0, content.length);
+    _mutatingBuffer = true;
+    if (_usesSentinel) {
+      _controller.value = TextEditingValue(
+        text: ItemTile.editStartSentinel + content,
+        selection: TextSelection.collapsed(
+            offset: offset + ItemTile.editStartSentinel.length),
+      );
+    } else {
+      _controller.value = TextEditingValue(
+        text: content,
+        selection: TextSelection.collapsed(offset: offset),
+      );
+    }
+    _mutatingBuffer = false;
+  }
+
+  /// The user typed before the sentinel; move it back to the front, preserving
+  /// the content and the caret's position relative to that content.
+  void _renormalizeBuffer() {
+    final raw = _controller.text;
+    final sentinelAt = raw.indexOf(ItemTile.editStartSentinel);
+    final content = raw.replaceFirst(ItemTile.editStartSentinel, '');
+    final caret = _controller.selection.baseOffset;
+    final logicalCaret = caret > sentinelAt ? caret - 1 : caret;
+    _setBuffer(content, logicalCaret);
+  }
+
+  /// The sentinel was deleted (Backspace at logical start). Ask the screen to
+  /// delete/merge; if it declines (no-op), restore the start state so detection
+  /// keeps working.
+  void _handleBackspaceAtStart() {
+    final handled = widget.onBackspaceAtStart?.call(widget.item.id) ?? false;
+    if (handled) {
+      setState(() => _isEditing = false);
+    } else {
+      // No-op (e.g. first item): keep editing, caret back at logical start.
+      _setBuffer(_controller.text, 0);
+    }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _focusNode.removeListener(_onFocusChange);
     _controller.dispose();
     // Only dispose a node this tile created; the shared node is owned by the
@@ -143,14 +236,16 @@ class _ItemTileState extends State<ItemTile> {
 
   void _startEditing() {
     setState(() => _isEditing = true);
-    // Defer focus request until after build
+    // Defer focus + buffer setup until after build (the TextField must exist).
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _focusNode.requestFocus();
+      _setBuffer(widget.item.text, widget.item.text.length);
     });
   }
 
   void _commitEdit() {
-    final text = _controller.text.trim();
+    final text = _logicalText.trim();
     if (text.isNotEmpty && text != widget.item.text) {
       bool ok = true;
       widget.update(() {
@@ -175,37 +270,14 @@ class _ItemTileState extends State<ItemTile> {
     ));
   }
 
-  /// Intercepts Backspace at caret offset 0 so the screen can delete this
-  /// (empty) item or merge it into the previous one. Returns
-  /// [KeyEventResult.handled] when an operation occurred so the default
-  /// TextField backspace does not also run; otherwise [ignored].
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (event.logicalKey != LogicalKeyboardKey.backspace) {
-      return KeyEventResult.ignored;
-    }
-    if (widget.onBackspaceAtStart == null) return KeyEventResult.ignored;
-
-    final selection = _controller.selection;
-    // Only act on a collapsed caret sitting at the very start of the text.
-    if (!selection.isCollapsed || selection.baseOffset != 0) {
-      return KeyEventResult.ignored;
-    }
-
-    final handled = widget.onBackspaceAtStart!(widget.item.id);
-    if (handled) {
-      setState(() => _isEditing = false);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
   void _handleSplit() {
     if (widget.onSplit == null) return;
-    final cursorPos = _controller.selection.baseOffset;
-    final text = _controller.text;
+    final text = _logicalText;
+    // Caret in logical (sentinel-stripped) coordinates.
+    final rawCaret = _controller.selection.baseOffset;
+    final cursorPos = (_usesSentinel && rawCaret >= 0)
+        ? rawCaret - ItemTile.editStartSentinel.length
+        : rawCaret;
     // If cursor position is invalid, treat as end of text
     final pos = (cursorPos >= 0 && cursorPos <= text.length) ? cursorPos : text.length;
     final before = text.substring(0, pos).trim();
@@ -249,25 +321,17 @@ class _ItemTileState extends State<ItemTile> {
                   ),
                 )
               : _isEditing
-                  ? Focus(
-                      // Observes key events from the focused TextField below so
-                      // Backspace-at-start can delete/merge; does not steal
-                      // focus or traversal from the field itself.
-                      canRequestFocus: false,
-                      skipTraversal: true,
-                      onKeyEvent: _handleKeyEvent,
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        onSubmitted: (_) => _handleSplit(),
-                        onTapOutside: (_) => _focusNode.unfocus(),
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
+                  ? TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      onSubmitted: (_) => _handleSplit(),
+                      onTapOutside: (_) => _focusNode.unfocus(),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
                         ),
                       ),
                     )

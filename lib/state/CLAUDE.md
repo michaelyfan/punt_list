@@ -48,6 +48,8 @@ check the bool and show a SnackBar.
 key handling. They mutate `items` and return the info the screen needs to move
 focus (`splitItem` → new item id; `backspaceAtStart` → previous item id +
 caret offset, or null for no-op including the parent-with-children exemption).
+`backspaceAtStart` *appends* the merged item's text onto the previous item
+(`previous.text + this.text`), caret at the boundary.
 The end-to-end flow across tile / state / screen is documented in one place in
 `../widgets/CLAUDE.md` ("Enter / Backspace item editing").
 

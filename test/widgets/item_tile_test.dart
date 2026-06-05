@@ -29,6 +29,7 @@ void main() {
       void Function(String, String)? onIndent,
       void Function(String)? onPromote,
       void Function(String, String, String)? onSplit,
+      bool Function(String)? onBackspaceAtStart,
       bool autoFocus = false,
       List<dynamic>? lists,
     }) {
@@ -57,6 +58,7 @@ void main() {
               onIndent: onIndent,
               onPromote: onPromote,
               onSplit: onSplit,
+              onBackspaceAtStart: onBackspaceAtStart,
               autoFocus: autoFocus,
             ),
           ),
@@ -119,7 +121,7 @@ void main() {
       await tester.pumpWidget(buildTile(
         itemId: 'item-1',
         canIndent: false,
-        onIndent: (_, __) => indentCalled = true,
+        onIndent: (_, _) => indentCalled = true,
       ));
 
       await tester.drag(find.text('Test item'), const Offset(70, 0));
@@ -155,6 +157,40 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(splitItemId, 'item-1');
+      expect(splitBefore, 'Hello');
+      expect(splitAfter, 'World');
+    });
+
+    testWidgets('split offsets are correct with the start sentinel enabled',
+        (tester) async {
+      // When onBackspaceAtStart is wired (the real app), the editor prepends a
+      // zero-width-space sentinel. Splitting must report *logical* offsets, not
+      // the sentinel-shifted controller offsets.
+      String? splitBefore;
+      String? splitAfter;
+
+      await tester.pumpWidget(buildTile(
+        itemId: 'item-1',
+        text: 'Hello World',
+        autoFocus: true,
+        onSplit: (itemId, before, after) {
+          splitBefore = before;
+          splitAfter = after;
+        },
+        onBackspaceAtStart: (_) => false,
+      ));
+      await tester.pumpAndSettle();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      // Buffer carries the sentinel; logical "Hello|World" is controller pos 6.
+      expect(textField.controller!.text,
+          '${ItemTile.editStartSentinel}Hello World');
+      textField.controller!.selection = const TextSelection.collapsed(offset: 6);
+      await tester.pump();
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
       expect(splitBefore, 'Hello');
       expect(splitAfter, 'World');
     });

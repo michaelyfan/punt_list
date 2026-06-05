@@ -18,11 +18,15 @@ The most behavior-dense widget in the app. Owns:
   style (no checkbox toggle, no swipe, no move arrow). Ghost parents only
   appear in the checked section.
 - **Sub-item indent** — purely visual (48px left padding when `isSubItem`).
-- **Backspace-delete / merge** — a `Focus.onKeyEvent` wrapper around the edit
-  `TextField` intercepts Backspace when the caret is collapsed at offset 0 and
-  fires `onBackspaceAtStart`. The screen runs `AppState.backspaceAtStart`
-  (delete empty / prepend-merge into previous) and then auto-focuses the
-  previous item via the shared focus node, passing the caret position through
+- **Backspace-delete / merge** — detected via a zero-width-space **sentinel**
+  (`ItemTile.editStartSentinel`) prepended to the edit buffer, *not* a key
+  event. Backspace at the logical start deletes the sentinel; a controller
+  listener (`_onControllerChanged`) sees it vanish and fires
+  `onBackspaceAtStart`. This is deliberate: mobile soft keyboards deliver edits
+  as text deltas, not raw `KeyEvent`s, so a `Focus.onKeyEvent` approach would
+  silently fail on Android/iOS. The screen runs `AppState.backspaceAtStart`
+  (delete empty / append-merge into previous) and auto-focuses the previous
+  item via the shared focus node, passing the caret position through
   `autoFocusCursorOffset`. `didUpdateWidget` re-applies autoFocus so a *reused*
   tile (the previous item already on screen) re-enters edit mode.
 - **Trash icon** — only rendered when the item `hasChildren` (parents of a
@@ -41,7 +45,7 @@ files by responsibility:
 
 | File | Responsibility |
 |------|----------------|
-| `item_tile.dart` | **Key detection.** `onSubmitted` (Enter) and `Focus.onKeyEvent` (Backspace) detect the gesture, read the caret/text from the controller, and fire callbacks. No state mutation here. |
+| `item_tile.dart` | **Gesture detection.** `onSubmitted` (Enter) and a sentinel-watching controller listener (Backspace-at-start) detect the gesture, read the caret/text from the controller, and fire callbacks. No state mutation here. |
 | `app_state.dart` | **State mutation.** `splitItem` and `backspaceAtStart` mutate `PuntList.items` (and fire Firestore writes). They are pure model operations and return the info the screen needs to move focus. |
 | `list_view_screen.dart` | **Orchestration.** Wires the callbacks, owns the shared `_editFocusNode` and the `_autoFocusItemId` / `_autoFocusCursorOffset` fields, and decides which tile autofocuses next. |
 
@@ -64,11 +68,22 @@ files by responsibility:
 
 ### Backspace at caret offset 0 (`backspaceAtStart`)
 
-`ItemTile._handleKeyEvent` only fires when the caret is **collapsed at offset
-0**; otherwise it returns `ignored` and the normal TextField backspace runs.
+**Detection (sentinel, not key events).** While editing, `ItemTile` prepends a
+zero-width-space sentinel (`ItemTile.editStartSentinel`) to the controller and
+keeps the caret after it. A Backspace at the logical start deletes the
+sentinel; `_onControllerChanged` notices the buffer no longer starts with it
+and calls `onBackspaceAtStart`. This is the **only reliable cross-platform
+signal** — on mobile soft keyboards Backspace arrives as a text delta, not a
+`KeyEvent`, so observing key events (the old `Focus.onKeyEvent` approach) would
+not fire on Android/iOS. The sentinel is never persisted: `_logicalText` strips
+it on commit, and `_handleSplit` subtracts its length from the caret offset.
+If the user types *before* the sentinel (caret at absolute 0),
+`_renormalizeBuffer` slides it back to the front instead of treating it as a
+delete.
+
 `AppState.backspaceAtStart` then decides, returning a
-`({String previousItemId, int cursorOffset})?` record (null = no-op, tile lets
-default backspace proceed):
+`({String previousItemId, int cursorOffset})?` record (null = no-op; the tile
+restores the sentinel and keeps editing):
 
 - **Parent exemption:** if the item `hasChildren`, returns null (no
   delete/merge). Parents keep the trash icon as their delete path.
@@ -77,9 +92,10 @@ default backspace proceed):
   item is first in that order (`pos <= 0`), returns null.
 - **Empty item → delete:** if the item's text is empty, remove it; caret goes
   to the **end** of the previous item (`cursorOffset = previous.text.length`).
-- **Non-empty → merge:** prepend this item's text onto the previous item, then
+- **Non-empty → merge:** append this item's text onto the previous item, then
   delete this item. Caret goes to the **merge boundary**
-  (`cursorOffset = this.text.length`, i.e. just after the prepended text).
+  (`cursorOffset = previous.text.length`, i.e. just before the appended text —
+  result is `previous.text + this.text`).
 - **Focus transfer:** the screen sets `_autoFocusItemId = previousItemId` and
   `_autoFocusCursorOffset = cursorOffset`. The previous tile is *already on
   screen and reused*, so `initState` does not re-run — `ItemTile.didUpdateWidget`
@@ -97,10 +113,11 @@ isolation). Because the focus node is shared and never disposed between the old
 and new/previous tile, focus never drops during a split or merge, so the soft
 keyboard stays open instead of flashing closed/reopen.
 
-`autoFocusCursorOffset` is clamped to the text length in
-`_applyAutoFocus` and applied via `WidgetsBinding.addPostFrameCallback` after
-the rebuild. The screen clears `_autoFocusItemId` in its own post-frame
-callback so a tile only autofocuses once per operation.
+`autoFocusCursorOffset` is clamped to the text length in `_setBuffer` (which
+also re-installs the sentinel) and applied via
+`WidgetsBinding.addPostFrameCallback` after the rebuild. The screen clears
+`_autoFocusItemId` in its own post-frame callback so a tile only autofocuses
+once per operation.
 
 ## DestinationDropdown
 

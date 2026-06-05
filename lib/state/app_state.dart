@@ -444,9 +444,10 @@ class AppState {
   ///   and returns null (no previous item to merge into / fall back to).
   /// - If the item's text is empty, deletes it and returns the previous item
   ///   with the caret at the end of its text.
-  /// - Otherwise prepends this item's text onto the previous item, deletes this
+  /// - Otherwise appends this item's text onto the previous item, deletes this
   ///   item, and returns the previous item with the caret at the merge boundary
-  ///   (the length of the text that was prepended).
+  ///   (the end of the previous item's original text, i.e. just before the
+  ///   appended text).
   ///
   /// Returns null when nothing happened.
   ({String previousItemId, int cursorOffset})? backspaceAtStart(
@@ -476,9 +477,10 @@ class AppState {
       return (previousItemId: previous.id, cursorOffset: previous.text.length);
     }
 
-    // Merge: prepend this item's text onto the previous item, then delete this.
-    final cursorOffset = item.text.length;
-    final mergedText = item.text + previous.text;
+    // Merge: append this item's text onto the previous item, then delete this.
+    // Caret lands at the boundary — the end of the previous item's old text.
+    final cursorOffset = previous.text.length;
+    final mergedText = previous.text + item.text;
     list.items[prevFlatIndex] =
         list.items[prevFlatIndex].copyWith(text: mergedText);
     list.items.removeWhere((i) => i.id == itemId);

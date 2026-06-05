@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:punt_list/screens/list_view_screen.dart';
+import 'package:punt_list/widgets/item_tile.dart';
 
 import '../helpers/test_helpers.dart';
 
@@ -254,6 +254,19 @@ void main() {
       expect(appState.lists.first.items.first.id, 'i1');
     });
 
+    // Simulates a Backspace at the logical start of the active editor. Detection
+    // is sentinel-based (so it works on soft keyboards), so the faithful
+    // simulation is the platform deleting the leading zero-width-space sentinel
+    // from the field — exactly what the IME delivers on Backspace-at-start.
+    void backspaceAtStartOfEditor(WidgetTester tester) {
+      final controller =
+          tester.widget<TextField>(find.byType(TextField).first).controller!;
+      expect(controller.text.startsWith(ItemTile.editStartSentinel), isTrue,
+          reason: 'active editor should carry the start sentinel');
+      controller.text =
+          controller.text.replaceFirst(ItemTile.editStartSentinel, '');
+    }
+
     testWidgets('backspace on an empty item deletes it', (tester) async {
       final item1 = makeItem(id: 'i1', text: 'First');
       final item2 = makeItem(id: 'i2', text: '');
@@ -269,14 +282,14 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('i2')), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      backspaceAtStartOfEditor(tester);
       await tester.pumpAndSettle();
 
       expect(appState.lists.first.items.length, 1);
       expect(appState.lists.first.items.first.id, 'i1');
     });
 
-    testWidgets('backspace at offset 0 with text merges into previous item',
+    testWidgets('backspace at offset 0 with text appends into previous item',
         (tester) async {
       final item1 = makeItem(id: 'i1', text: 'Hello');
       final item2 = makeItem(id: 'i2', text: 'World');
@@ -286,20 +299,17 @@ void main() {
         ListViewScreen(listId: 'list-1', appState: appState, update: update),
       );
 
-      // Edit the second item and put the caret at the very start.
+      // Edit the second item, then backspace at its start.
       await tester.tap(find.text('World'));
       await tester.pumpAndSettle();
-      final field = tester.widget<TextField>(find.byType(TextField).first);
-      field.controller!.selection = const TextSelection.collapsed(offset: 0);
-      await tester.pump();
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      backspaceAtStartOfEditor(tester);
       await tester.pumpAndSettle();
 
-      // Second item merged into the first; text prepended.
+      // Second item merged into the first; its text appended after "Hello".
       expect(appState.lists.first.items.length, 1);
       expect(appState.lists.first.items.first.id, 'i1');
-      expect(appState.lists.first.items.first.text, 'WorldHello');
+      expect(appState.lists.first.items.first.text, 'HelloWorld');
     });
 
     testWidgets('backspace at offset 0 on a parent-with-children is a no-op',
