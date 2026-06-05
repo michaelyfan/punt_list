@@ -158,7 +158,6 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 ### Deferred
 - [ ] Unified design language and full app redesign
 - [ ] Official app icon
-- [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show. Draft plan in `ONBOARDING_TRIGGER.md` (auto-show `HelpDialog` once per user, gated by an `onboardingCompleted` flag in user preferences); review/refine that instead of starting a new plan
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
 - [ ] Error feedback for failed Firestore writes (currently fire-and-forget) — draft plan in `ERROR_FEEDBACK.md`; review/refine that instead of starting a new plan
