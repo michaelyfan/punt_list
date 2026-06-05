@@ -409,6 +409,65 @@ class AppState {
     _firestore?.deleteItems(listId, deletedIds);
   }
 
+  /// Result of a Backspace-at-start operation in [backspaceAtStart].
+  /// [previousItemId] is the item that should receive focus afterwards (null if
+  /// no operation occurred); [cursorOffset] is where to place the caret in it.
+  /// [merged] is true when text was merged into the previous item.
+
+  /// Handles Backspace pressed at offset 0 of an active item's editor.
+  ///
+  /// Behavior (Google-Keep / Notion style):
+  /// - If [itemId] has children (is a parent of a sub-list), does nothing and
+  ///   returns null — parents are exempt from delete/merge-on-backspace.
+  /// - If [itemId] is the first item in the active display order, does nothing
+  ///   and returns null (no previous item to merge into / fall back to).
+  /// - If the item's text is empty, deletes it and returns the previous item
+  ///   with the caret at the end of its text.
+  /// - Otherwise prepends this item's text onto the previous item, deletes this
+  ///   item, and returns the previous item with the caret at the merge boundary
+  ///   (the length of the text that was prepended).
+  ///
+  /// Returns null when nothing happened.
+  ({String previousItemId, int cursorOffset})? backspaceAtStart(
+      String listId, String itemId) {
+    final list = _findList(listId);
+    if (list == null) return null;
+
+    // Exempt: parents of a sub-list.
+    if (list.hasChildren(itemId)) return null;
+
+    // Determine the previous item in the active display order.
+    final display = list.activeDisplayItems;
+    final pos = display.indexWhere((d) => d.item.id == itemId);
+    if (pos <= 0) return null; // not found or first item — no previous item.
+    final item = display[pos].item;
+    final previous = display[pos - 1].item;
+
+    final flatIndex = list.items.indexWhere((i) => i.id == itemId);
+    if (flatIndex == -1) return null;
+    final prevFlatIndex = list.items.indexWhere((i) => i.id == previous.id);
+    if (prevFlatIndex == -1) return null;
+
+    if (item.text.isEmpty) {
+      // Delete the empty item; focus end of previous item.
+      list.items.removeAt(flatIndex);
+      _firestore?.deleteItems(listId, [itemId]);
+      return (previousItemId: previous.id, cursorOffset: previous.text.length);
+    }
+
+    // Merge: prepend this item's text onto the previous item, then delete this.
+    final cursorOffset = item.text.length;
+    final mergedText = item.text + previous.text;
+    list.items[prevFlatIndex] =
+        list.items[prevFlatIndex].copyWith(text: mergedText);
+    list.items.removeWhere((i) => i.id == itemId);
+
+    _firestore?.updateItem(listId, previous.id, {'text': mergedText});
+    _firestore?.deleteItems(listId, [itemId]);
+
+    return (previousItemId: previous.id, cursorOffset: cursorOffset);
+  }
+
   void clearCheckedItems(String listId) {
     final list = _findList(listId);
     if (list == null) return;

@@ -25,6 +25,10 @@ class ListViewScreen extends StatefulWidget {
 class _ListViewScreenState extends State<ListViewScreen> {
   String? _autoFocusItemId;
 
+  /// Caret offset to apply to the auto-focused item. 0 for split-created items;
+  /// the merge boundary (or previous-item end) for Backspace operations.
+  int _autoFocusCursorOffset = 0;
+
   /// Single focus node shared by whichever active item is being inline-edited.
   /// Only one tile renders a TextField at a time, so they can safely reuse it.
   /// On Enter-to-split the new tile binds this same node, so focus is never
@@ -332,7 +336,20 @@ class _ListViewScreenState extends State<ListViewScreen> {
                                 canPromote: canPromote,
                                 indentTargetParentId: indentTargetParentId,
                                 autoFocus: shouldAutoFocus,
+                                autoFocusCursorOffset: shouldAutoFocus
+                                    ? _autoFocusCursorOffset
+                                    : 0,
                                 sharedEditFocusNode: _editFocusNode,
+                                onBackspaceAtStart: (itemId) {
+                                  final result = widget.appState
+                                      .backspaceAtStart(widget.listId, itemId);
+                                  if (result == null) return false;
+                                  widget.update(() {
+                                    _autoFocusItemId = result.previousItemId;
+                                    _autoFocusCursorOffset = result.cursorOffset;
+                                  });
+                                  return true;
+                                },
                                 onIndent: (itemId, targetParentId) {
                                   widget.update(() {
                                     widget.appState.indentItem(
@@ -359,6 +376,7 @@ class _ListViewScreenState extends State<ListViewScreen> {
                                       afterText,
                                     );
                                     _autoFocusItemId = newId;
+                                    _autoFocusCursorOffset = 0;
                                   });
                                 },
                               );

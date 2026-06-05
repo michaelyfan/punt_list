@@ -159,7 +159,7 @@ void main() {
       expect(splitAfter, 'World');
     });
 
-    testWidgets('ghost parent has disabled checkbox and no delete button', (tester) async {
+    testWidgets('ghost parent has disabled checkbox', (tester) async {
       await tester.pumpWidget(buildTile(
         itemId: 'ghost-1',
         text: 'Ghost parent',
@@ -169,9 +169,40 @@ void main() {
       // Checkbox should be present but disabled
       final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
       expect(checkbox.onChanged, isNull);
+    });
 
-      // No delete button for ghost parents
+    testWidgets('plain item has no trash icon', (tester) async {
+      // The per-item trash icon was removed; non-parent items rely on
+      // Backspace-to-delete instead.
+      await tester.pumpWidget(buildTile(itemId: 'item-1', text: 'Plain'));
       expect(find.byIcon(Icons.delete_outline), findsNothing);
+    });
+
+    testWidgets('parent-with-children shows a trash icon', (tester) async {
+      // A parent of a sub-list is exempt from Backspace-delete, so it keeps the
+      // trash icon as its delete affordance.
+      final parent = makeItem(id: 'parent-1', text: 'Parent');
+      final child = makeItem(id: 'child-1', text: 'Child', parentId: 'parent-1');
+      final appState = createTestAppState(lists: [
+        makeList(id: listId, name: 'Test', items: [parent, child]),
+      ]);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            child: ItemTile(
+              item: parent,
+              listId: listId,
+              showMoveButton: false,
+              itemIndex: 0,
+              appState: appState,
+              update: update,
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
     });
 
     testWidgets('sub-item has indented card margin', (tester) async {

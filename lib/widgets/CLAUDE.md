@@ -18,6 +18,17 @@ The most behavior-dense widget in the app. Owns:
   style (no checkbox toggle, no swipe, no move arrow). Ghost parents only
   appear in the checked section.
 - **Sub-item indent** — purely visual (48px left padding when `isSubItem`).
+- **Backspace-delete / merge** — a `Focus.onKeyEvent` wrapper around the edit
+  `TextField` intercepts Backspace when the caret is collapsed at offset 0 and
+  fires `onBackspaceAtStart`. The screen runs `AppState.backspaceAtStart`
+  (delete empty / prepend-merge into previous) and then auto-focuses the
+  previous item via the shared focus node, passing the caret position through
+  `autoFocusCursorOffset`. `didUpdateWidget` re-applies autoFocus so a *reused*
+  tile (the previous item already on screen) re-enters edit mode.
+- **Trash icon** — only rendered when the item `hasChildren` (parents of a
+  sub-list, plus ghost parents). Childless items have no trash icon; Backspace
+  is their delete path. Parents are exempt from Backspace-delete, hence the
+  retained affordance.
 
 If `editItemText` returns false (limit), revert the controller text and show
 a SnackBar — do not leave the field in an inconsistent state.

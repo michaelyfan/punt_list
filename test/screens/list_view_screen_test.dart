@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:punt_list/screens/list_view_screen.dart';
 
@@ -227,19 +228,94 @@ void main() {
       expect(find.textContaining('Tap'), findsOneWidget);
     });
 
-    testWidgets('delete item removes it', (tester) async {
-      final item = makeItem(id: 'i1', text: 'Delete me');
-      final list = makeList(id: 'list-1', name: 'Test', items: [item]);
+    testWidgets('parent-with-children retains a trash delete affordance',
+        (tester) async {
+      // Non-parent items lose the trash icon (Backspace deletes them), but a
+      // parent of a sub-list keeps it as its delete entry point.
+      final parent = makeItem(id: 'p1', text: 'Parent');
+      final child = makeItem(id: 'c1', text: 'Child', parentId: 'p1');
+      final plain = makeItem(id: 'i1', text: 'Plain');
+      final list =
+          makeList(id: 'list-1', name: 'Test', items: [parent, child, plain]);
       final appState = createTestAppState(lists: [list]);
       await pumpScreen(
         tester,
         ListViewScreen(listId: 'list-1', appState: appState, update: testUpdate),
       );
 
+      // Exactly one trash icon (the parent's); the plain item and child have none.
+      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
 
-      expect(appState.lists.first.items, isEmpty);
+      // Parent + child cascade-deleted; the plain item remains.
+      expect(appState.lists.first.items.length, 1);
+      expect(appState.lists.first.items.first.id, 'i1');
+    });
+
+    testWidgets('backspace on an empty item deletes it', (tester) async {
+      final item1 = makeItem(id: 'i1', text: 'First');
+      final item2 = makeItem(id: 'i2', text: '');
+      final list = makeList(id: 'list-1', name: 'Test', items: [item1, item2]);
+      final appState = createTestAppState(lists: [list]);
+      await pumpStatefulScreen(tester, builder: (update) =>
+        ListViewScreen(listId: 'list-1', appState: appState, update: update),
+      );
+
+      // Enter edit mode on the empty second item (no text to tap, so target
+      // the tile by key; warnIfMissed is off because the empty row's tappable
+      // area is small).
+      await tester.tap(find.byKey(const ValueKey('i2')), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pumpAndSettle();
+
+      expect(appState.lists.first.items.length, 1);
+      expect(appState.lists.first.items.first.id, 'i1');
+    });
+
+    testWidgets('backspace at offset 0 with text merges into previous item',
+        (tester) async {
+      final item1 = makeItem(id: 'i1', text: 'Hello');
+      final item2 = makeItem(id: 'i2', text: 'World');
+      final list = makeList(id: 'list-1', name: 'Test', items: [item1, item2]);
+      final appState = createTestAppState(lists: [list]);
+      await pumpStatefulScreen(tester, builder: (update) =>
+        ListViewScreen(listId: 'list-1', appState: appState, update: update),
+      );
+
+      // Edit the second item and put the caret at the very start.
+      await tester.tap(find.text('World'));
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(find.byType(TextField).first);
+      field.controller!.selection = const TextSelection.collapsed(offset: 0);
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pumpAndSettle();
+
+      // Second item merged into the first; text prepended.
+      expect(appState.lists.first.items.length, 1);
+      expect(appState.lists.first.items.first.id, 'i1');
+      expect(appState.lists.first.items.first.text, 'WorldHello');
+    });
+
+    testWidgets('backspace at offset 0 on a parent-with-children is a no-op',
+        (tester) async {
+      final parent = makeItem(id: 'p1', text: 'Parent');
+      final child = makeItem(id: 'c1', text: 'Child', parentId: 'p1');
+      final list = makeList(id: 'list-1', name: 'Test', items: [parent, child]);
+      final appState = createTestAppState(lists: [list]);
+      await pumpStatefulScreen(tester, builder: (update) =>
+        ListViewScreen(listId: 'list-1', appState: appState, update: update),
+      );
+
+      // backspaceAtStart should refuse to delete/merge a parent of a sub-list.
+      final result = appState.backspaceAtStart('list-1', 'p1');
+      expect(result, isNull);
+      expect(appState.lists.first.items.length, 2);
     });
 
     testWidgets('rename list via menu', (tester) async {

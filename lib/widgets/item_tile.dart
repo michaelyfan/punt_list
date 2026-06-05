@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/punt_item.dart';
 import '../state/app_state.dart';
 
@@ -18,7 +19,19 @@ class ItemTile extends StatefulWidget {
   final void Function(String itemId, String targetParentId)? onIndent;
   final void Function(String itemId)? onPromote;
   final void Function(String itemId, String beforeText, String afterText)? onSplit;
+
+  /// Called when Backspace is pressed while the editor caret is at offset 0.
+  /// The screen decides whether to delete this (empty) item or merge it into
+  /// the previous one. Returns true if the tile should stop editing (an
+  /// operation occurred and focus moved elsewhere), false to let the default
+  /// TextField behavior proceed.
+  final bool Function(String itemId)? onBackspaceAtStart;
+
   final bool autoFocus;
+
+  /// Caret offset to place when [autoFocus] starts editing. Defaults to 0
+  /// (used by split-created items). Backspace-merge passes the merge boundary.
+  final int autoFocusCursorOffset;
 
   /// Shared focus node for the active inline editor. When a split creates a
   /// new item, the old tile stops editing and the new tile (autoFocus) starts
@@ -44,7 +57,9 @@ class ItemTile extends StatefulWidget {
     this.onIndent,
     this.onPromote,
     this.onSplit,
+    this.onBackspaceAtStart,
     this.autoFocus = false,
+    this.autoFocusCursorOffset = 0,
     this.sharedEditFocusNode,
   });
 
@@ -64,6 +79,15 @@ class _ItemTileState extends State<ItemTile> {
   FocusNode get _focusNode =>
       widget.sharedEditFocusNode ?? (_ownFocusNode ??= FocusNode());
 
+  /// True when this item is a parent of a sub-list (has at least one child).
+  /// Parents are exempt from Backspace-delete/merge, so they retain the trash
+  /// icon as their delete affordance.
+  bool get _hasChildren {
+    final matches = widget.appState.lists.where((l) => l.id == widget.listId);
+    if (matches.isEmpty) return false;
+    return matches.first.hasChildren(widget.item.id);
+  }
+
   void _onFocusChange() {
     if (!_focusNode.hasFocus && _isEditing) {
       _commitEdit();
@@ -77,12 +101,7 @@ class _ItemTileState extends State<ItemTile> {
     _focusNode.addListener(_onFocusChange);
     if (widget.autoFocus) {
       _isEditing = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _focusNode.requestFocus();
-        // Place cursor at start for split-created items
-        _controller.selection = TextSelection.collapsed(offset: 0);
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyAutoFocus());
     }
   }
 
@@ -93,6 +112,23 @@ class _ItemTileState extends State<ItemTile> {
     if (!_isEditing && widget.item.text != _controller.text) {
       _controller.text = widget.item.text;
     }
+    // autoFocus flips true on an existing tile when the previous item absorbs a
+    // Backspace delete/merge (the previous tile is reused, so initState does not
+    // re-run). Enter edit mode and grab focus in that case.
+    if (widget.autoFocus && !oldWidget.autoFocus) {
+      setState(() => _isEditing = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyAutoFocus());
+    }
+  }
+
+  /// Requests focus and positions the caret at [ItemTile.autoFocusCursorOffset]
+  /// (clamped to the current text length).
+  void _applyAutoFocus() {
+    if (!mounted) return;
+    _focusNode.requestFocus();
+    final offset =
+        widget.autoFocusCursorOffset.clamp(0, _controller.text.length);
+    _controller.selection = TextSelection.collapsed(offset: offset);
   }
 
   @override
@@ -137,6 +173,33 @@ class _ItemTileState extends State<ItemTile> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('List is full (20,000-character limit reached).'),
     ));
+  }
+
+  /// Intercepts Backspace at caret offset 0 so the screen can delete this
+  /// (empty) item or merge it into the previous one. Returns
+  /// [KeyEventResult.handled] when an operation occurred so the default
+  /// TextField backspace does not also run; otherwise [ignored].
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey != LogicalKeyboardKey.backspace) {
+      return KeyEventResult.ignored;
+    }
+    if (widget.onBackspaceAtStart == null) return KeyEventResult.ignored;
+
+    final selection = _controller.selection;
+    // Only act on a collapsed caret sitting at the very start of the text.
+    if (!selection.isCollapsed || selection.baseOffset != 0) {
+      return KeyEventResult.ignored;
+    }
+
+    final handled = widget.onBackspaceAtStart!(widget.item.id);
+    if (handled) {
+      setState(() => _isEditing = false);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _handleSplit() {
@@ -186,17 +249,25 @@ class _ItemTileState extends State<ItemTile> {
                   ),
                 )
               : _isEditing
-                  ? TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      onSubmitted: (_) => _handleSplit(),
-                      onTapOutside: (_) => _focusNode.unfocus(),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
+                  ? Focus(
+                      // Observes key events from the focused TextField below so
+                      // Backspace-at-start can delete/merge; does not steal
+                      // focus or traversal from the field itself.
+                      canRequestFocus: false,
+                      skipTraversal: true,
+                      onKeyEvent: _handleKeyEvent,
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        onSubmitted: (_) => _handleSplit(),
+                        onTapOutside: (_) => _focusNode.unfocus(),
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     )
@@ -213,9 +284,15 @@ class _ItemTileState extends State<ItemTile> {
                       ),
                     ),
         ),
-        if (!isGhost)
+        // The per-item trash icon was removed in favor of Backspace-to-delete
+        // (empty item) / Backspace-to-merge (caret at start). Parents of a
+        // sub-list are exempt from that behavior, so they would otherwise have
+        // no delete entry point — keep the trash icon for those (and for ghost
+        // parents, which represent an unchecked parent with checked children).
+        if (_hasChildren)
           IconButton(
             icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete (with sub-items)',
             onPressed: () => widget.update(() {
               widget.appState.deleteItem(widget.listId, widget.item.id);
             }),
