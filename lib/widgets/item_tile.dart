@@ -20,6 +20,13 @@ class ItemTile extends StatefulWidget {
   final void Function(String itemId, String beforeText, String afterText)? onSplit;
   final bool autoFocus;
 
+  /// Shared focus node for the active inline editor. When a split creates a
+  /// new item, the old tile stops editing and the new tile (autoFocus) starts
+  /// editing using this same node — focus never drops, so the soft keyboard
+  /// stays open instead of flashing closed/open. Optional: when null, each
+  /// tile falls back to an internal node (used by isolated widget tests).
+  final FocusNode? sharedEditFocusNode;
+
   const ItemTile({
     super.key,
     required this.item,
@@ -38,6 +45,7 @@ class ItemTile extends StatefulWidget {
     this.onPromote,
     this.onSplit,
     this.autoFocus = false,
+    this.sharedEditFocusNode,
   });
 
   @override
@@ -47,23 +55,30 @@ class ItemTile extends StatefulWidget {
 class _ItemTileState extends State<ItemTile> {
   bool _isEditing = false;
   late final TextEditingController _controller;
-  late final FocusNode _focusNode;
+  FocusNode? _ownFocusNode;
   double _swipeOffset = 0;
   static const _swipeThreshold = 60.0;
+
+  /// The node bound to this tile's TextField. Prefers the screen-shared node
+  /// so focus survives split transitions; falls back to an internal node.
+  FocusNode get _focusNode =>
+      widget.sharedEditFocusNode ?? (_ownFocusNode ??= FocusNode());
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus && _isEditing) {
+      _commitEdit();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.item.text);
-    _focusNode = FocusNode();
-    _focusNode.addListener(() {
-      if (!_focusNode.hasFocus && _isEditing) {
-        _commitEdit();
-      }
-    });
+    _focusNode.addListener(_onFocusChange);
     if (widget.autoFocus) {
       _isEditing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         _focusNode.requestFocus();
         // Place cursor at start for split-created items
         _controller.selection = TextSelection.collapsed(offset: 0);
@@ -82,8 +97,11 @@ class _ItemTileState extends State<ItemTile> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     _controller.dispose();
-    _focusNode.dispose();
+    // Only dispose a node this tile created; the shared node is owned by the
+    // screen and outlives individual tiles.
+    _ownFocusNode?.dispose();
     super.dispose();
   }
 

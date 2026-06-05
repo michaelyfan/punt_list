@@ -25,6 +25,18 @@ class ListViewScreen extends StatefulWidget {
 class _ListViewScreenState extends State<ListViewScreen> {
   String? _autoFocusItemId;
 
+  /// Single focus node shared by whichever active item is being inline-edited.
+  /// Only one tile renders a TextField at a time, so they can safely reuse it.
+  /// On Enter-to-split the new tile binds this same node, so focus is never
+  /// released and the soft keyboard does not flash closed/open between items.
+  final FocusNode _editFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _editFocusNode.dispose();
+    super.dispose();
+  }
+
   Future<void> _showAddItemsDialog(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final lines = await showDialog<List<String>>(
@@ -101,6 +113,8 @@ class _ListViewScreenState extends State<ListViewScreen> {
     messenger.showSnackBar(
       SnackBar(
         content: Text('"${list.name}" deleted'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () {
@@ -318,6 +332,7 @@ class _ListViewScreenState extends State<ListViewScreen> {
                                 canPromote: canPromote,
                                 indentTargetParentId: indentTargetParentId,
                                 autoFocus: shouldAutoFocus,
+                                sharedEditFocusNode: _editFocusNode,
                                 onIndent: (itemId, targetParentId) {
                                   widget.update(() {
                                     widget.appState.indentItem(

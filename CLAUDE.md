@@ -158,7 +158,6 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 ### Deferred
 - [ ] Unified design language and full app redesign
 - [ ] Official app icon
-- [ ] Onboarding trigger logic — currently help popup is only in Settings; decide when to auto-show. Draft plan in `ONBOARDING_TRIGGER.md` (auto-show `HelpDialog` once per user, gated by an `onboardingCompleted` flag in user preferences); review/refine that instead of starting a new plan
 - [ ] Firebase support email configuration
 - [ ] Real-time listeners for cross-device sync without app restart
 - [ ] Error feedback for failed Firestore writes (currently fire-and-forget) — draft plan in `ERROR_FEEDBACK.md`; review/refine that instead of starting a new plan
@@ -175,12 +174,12 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 - [x] Enforce 20,000-character total limit per list. Strategy: sum of `text` length across all items (parents + sub-items, checked + unchecked). Gated in `AppState.addItem`/`addItems`/`editItemText`/`moveItem` (return `false` and no-op when over); UI shows a SnackBar via `list_view_screen` and `item_tile`. `splitItem` is unchanged (split is text-preserving).
 
 ### General
-- [ ] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input
+- [x] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input. The undo SnackBar in `list_view_screen.dart` (`_confirmDeleteList`) now uses `SnackBarBehavior.floating` (so it no longer permanently occupies the bottom input area) and `Duration(seconds: 3)` (down from the 4s default).
 - [x] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items). `ListCard` subtitle now shows the active (unchecked) item texts joined by " · " on a single ellipsized line; falls back to "No items" (empty list) or "All done" (everything checked). Tested in `lists_screen_test.dart`.
-- [ ] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open
+- [x] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open. Cause: each `ItemTile` owned its own `FocusNode`, so on split the old field's node was dropped and the new field requested focus a frame later, leaving a focus gap that closed the soft keyboard. Fix: `ListViewScreen` now owns a single `_editFocusNode` shared by all active tiles (passed as `ItemTile.sharedEditFocusNode`). Only one tile renders a `TextField` at a time, so they safely reuse the node; on Enter-to-split the new tile binds the same already-focused node, so focus is never released and the keyboard stays up. The node is optional — when null (isolated `item_tile` widget tests) each tile falls back to an internal node. In `item_tile.dart` / `list_view_screen.dart`.
 - [ ] Remove the trash icon — Backspace on an empty item should delete it instead. if you press backspace and you're at the beginning of the text but the item still has characters, it gets prepended to the previous item. Does not apply to parents of sub-lists.
 - [x] Punt button is too bright, loud, and big — tone it down (color/size). Removed the filled primary-color circle; the move arrow is now a borderless `IconButton` (`iconSize: 20`, `VisualDensity.compact`) tinted with `colorScheme.primary` at 0.6 alpha. Icon unchanged (`Icons.arrow_forward`) so existing visibility tests still match. In `item_tile.dart`.
-- [ ] Change the official app name (as shown in the phone's app menu) to "Punt List"
+- [x] Change the official app name (as shown in the phone's app menu) to "Punt List". Set the display name across platforms: Android `android:label` (`android/app/src/main/AndroidManifest.xml`), iOS `CFBundleName` (`ios/Runner/Info.plist` — `CFBundleDisplayName` was already "Punt List"), macOS `PRODUCT_NAME` (`macos/Runner/Configs/AppInfo.xcconfig`, flows into `CFBundleName` via `$(PRODUCT_NAME)`), and Web `name`/`short_name` (`web/manifest.json`) plus `<title>` and `apple-mobile-web-app-title` (`web/index.html`).
 - [x] Add "Uncheck all items" to the three-dot menu. `AppState.uncheckAllItems` clears `isChecked` on all items and fires a surgical `batchUpdateItems` (no reorder — order is unchanged); wired into the `ListViewScreen` popup menu (no confirm dialog, since it's non-destructive). Tested in `list_view_screen_test.dart`.
 - [ ] enable or validate Google sign in
 - [ ] document and/or code-consolidate all our logic related to enter/backspace on items (both as root items and as sublists)
