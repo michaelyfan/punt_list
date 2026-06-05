@@ -175,7 +175,7 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 - [x] Enforce 20,000-character total limit per list. Strategy: sum of `text` length across all items (parents + sub-items, checked + unchecked). Gated in `AppState.addItem`/`addItems`/`editItemText`/`moveItem` (return `false` and no-op when over); UI shows a SnackBar via `list_view_screen` and `item_tile`. `splitItem` is unchanged (split is text-preserving).
 
 ### General
-- [ ] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input
+- [x] List deletion is annoying — the sticky undo toast stays up too long and blocks the bottom text input. The undo SnackBar in `list_view_screen.dart` (`_confirmDeleteList`) now uses `SnackBarBehavior.floating` (so it no longer permanently occupies the bottom input area) and `Duration(seconds: 3)` (down from the 4s default).
 - [x] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items). `ListCard` subtitle now shows the active (unchecked) item texts joined by " · " on a single ellipsized line; falls back to "No items" (empty list) or "All done" (everything checked). Tested in `lists_screen_test.dart`.
 - [ ] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open
 - [ ] Remove the trash icon — Backspace on an empty item should delete it instead. if you press backspace and you're at the beginning of the text but the item still has characters, it gets prepended to the previous item. Does not apply to parents of sub-lists.
