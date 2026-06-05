@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show FieldValue, FirebaseException;
 import 'package:flutter/material.dart';
 import '../models/punt_item.dart';
 import '../models/punt_list.dart';
@@ -11,8 +12,29 @@ class AppState {
 
   FirestoreService? _firestore;
 
+  /// Called when a fire-and-forget Firestore write *permanently* fails (e.g.
+  /// permission-denied, invalid data). Transient offline failures are NOT
+  /// reported here — the Firestore SDK queues those and retries, so their
+  /// futures stay pending (and any `unavailable` errors are filtered out in
+  /// [_report]). Wired by `main.dart` to a global SnackBar.
+  void Function(Object error)? onError;
+
   AppState({List<PuntList>? lists, this.themeMode = ThemeMode.system})
       : lists = lists ?? [];
+
+  /// Observe a fire-and-forget Firestore write future. On a permanent failure
+  /// it forwards the error to [onError]; transient offline errors
+  /// (`unavailable`) are ignored, since the SDK will retry them.
+  void _report(Future<void>? future) {
+    future?.catchError((Object error) {
+      if (error is FirebaseException &&
+          (error.code == 'unavailable' || error.code == 'deadline-exceeded')) {
+        // Network/offline — the SDK queues and retries. Not user-actionable.
+        return;
+      }
+      onError?.call(error);
+    });
+  }
 
   // ── Firestore integration ─────────────────────────────────────────
 
@@ -69,16 +91,17 @@ class AppState {
   // ── Persistence helpers ───────────────────────────────────────────
 
   void _persistListOrder() {
-    _firestore?.saveUserPreferences({
+    _report(_firestore?.saveUserPreferences({
       'listOrder': lists.map((l) => l.id).toList(),
-    });
+    }));
   }
 
   void _persistListItems(String listId, {bool isNew = false}) {
     if (_firestore == null) return;
     final list = _findList(listId);
     if (list == null) return;
-    _firestore!.syncListItems(listId, List.from(list.items), isNew: isNew);
+    _report(
+        _firestore!.syncListItems(listId, List.from(list.items), isNew: isNew));
   }
 
   // ── Lists ─────────────────────────────────────────────────────────
@@ -87,10 +110,10 @@ class AppState {
     final list = PuntList(id: _generateId(), name: 'New List');
     lists.add(list);
 
-    _firestore?.saveList(list.id, {
+    _report(_firestore?.saveList(list.id, {
       ...list.toMap(),
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    }));
     _persistListOrder();
 
     return list;
@@ -114,23 +137,23 @@ class AppState {
     }
     lists.removeWhere((l) => l.id == listId);
 
-    _firestore?.deleteListAndItems(listId);
+    _report(_firestore?.deleteListAndItems(listId));
     _persistListOrder();
     for (final id in affectedListIds) {
-      _firestore?.saveList(id, {'destinationListId': null});
+      _report(_firestore?.saveList(id, {'destinationListId': null}));
     }
   }
 
   void renameList(String listId, String newName) {
     _findList(listId)?.name = newName;
-    _firestore?.saveList(listId, {'name': newName});
+    _report(_firestore?.saveList(listId, {'name': newName}));
   }
 
   void setDestination(String listId, String? destId) {
     final list = _findList(listId);
     if (list != null) {
       list.destinationListId = destId;
-      _firestore?.saveList(listId, {'destinationListId': destId});
+      _report(_firestore?.saveList(listId, {'destinationListId': destId}));
     }
   }
 
@@ -141,14 +164,14 @@ class AppState {
       if (dependent != null) dependent.destinationListId = list.id;
     }
 
-    _firestore?.saveList(list.id, {
+    _report(_firestore?.saveList(list.id, {
       ...list.toMap(),
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    }));
     _persistListItems(list.id, isNew: true);
     _persistListOrder();
     for (final id in dependentListIds) {
-      _firestore?.saveList(id, {'destinationListId': list.id});
+      _report(_firestore?.saveList(id, {'destinationListId': list.id}));
     }
   }
 
@@ -405,7 +428,7 @@ class AppState {
 
     list.items.removeWhere((i) => i.id == itemId || i.parentId == itemId);
 
-    _firestore?.deleteItems(listId, deletedIds);
+    _report(_firestore?.deleteItems(listId, deletedIds));
   }
 
   /// Handles Backspace pressed at offset 0 of an active item's editor.
@@ -449,7 +472,7 @@ class AppState {
     if (item.text.isEmpty) {
       // Delete the empty item; focus end of previous item.
       list.items.removeAt(flatIndex);
-      _firestore?.deleteItems(listId, [itemId]);
+      _report(_firestore?.deleteItems(listId, [itemId]));
       return (previousItemId: previous.id, cursorOffset: previous.text.length);
     }
 
@@ -460,8 +483,8 @@ class AppState {
         list.items[prevFlatIndex].copyWith(text: mergedText);
     list.items.removeWhere((i) => i.id == itemId);
 
-    _firestore?.updateItem(listId, previous.id, {'text': mergedText});
-    _firestore?.deleteItems(listId, [itemId]);
+    _report(_firestore?.updateItem(listId, previous.id, {'text': mergedText}));
+    _report(_firestore?.deleteItems(listId, [itemId]));
 
     return (previousItemId: previous.id, cursorOffset: cursorOffset);
   }
@@ -475,7 +498,7 @@ class AppState {
 
     list.items.removeWhere((i) => i.isChecked);
 
-    _firestore?.deleteItems(listId, checkedIds);
+    _report(_firestore?.deleteItems(listId, checkedIds));
   }
 
   void uncheckAllItems(String listId) {
@@ -491,7 +514,7 @@ class AppState {
     }
     if (updates.isEmpty) return;
 
-    _firestore?.batchUpdateItems(listId, updates);
+    _report(_firestore?.batchUpdateItems(listId, updates));
   }
 
   void toggleItem(String listId, String itemId) {
@@ -527,7 +550,7 @@ class AppState {
       }
     }
 
-    _firestore?.batchUpdateItems(listId, updates);
+    _report(_firestore?.batchUpdateItems(listId, updates));
   }
 
   /// Returns false if growing this item's text would push the list past
@@ -544,7 +567,7 @@ class AppState {
     }
     list.items[index] = list.items[index].copyWith(text: newText);
 
-    _firestore?.updateItem(listId, itemId, {'text': newText});
+    _report(_firestore?.updateItem(listId, itemId, {'text': newText}));
     return true;
   }
 
@@ -586,12 +609,12 @@ class AppState {
       source.items.removeAt(index);
       dest.items.add(item.copyWith(isChecked: false));
 
-      _firestore?.puntItems(
+      _report(_firestore?.puntItems(
         sourceListId: sourceListId,
         sourceDeleteIds: [itemId],
         destListId: destListId,
         destItems: List.from(dest.items),
-      );
+      ));
       return true;
     }
 
@@ -621,12 +644,12 @@ class AppState {
     }
     dest.items.addAll(children);
 
-    _firestore?.puntItems(
+    _report(_firestore?.puntItems(
       sourceListId: sourceListId,
       sourceDeleteIds: removedIds,
       destListId: destListId,
       destItems: List.from(dest.items),
-    );
+    ));
     return true;
   }
 
@@ -634,9 +657,9 @@ class AppState {
 
   void setThemeMode(ThemeMode mode) {
     themeMode = mode;
-    _firestore?.saveUserPreferences({
+    _report(_firestore?.saveUserPreferences({
       'themePreference': _themeModeToString(mode),
-    });
+    }));
   }
 
   // ── Helpers ───────────────────────────────────────────────────────

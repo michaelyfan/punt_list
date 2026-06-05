@@ -1,4 +1,13 @@
-# Plan: Error feedback for failed Firestore writes
+# Error feedback for failed Firestore writes — IMPLEMENTED
+
+> **Status: done.** Implemented in `lib/state/app_state.dart` (`onError` field +
+> `_report` helper wrapping every `_firestore?.…` write) and `lib/main.dart`
+> (global `scaffoldMessengerKey` + debounced SnackBar via `_handleWriteError`).
+> Transient offline errors (`FirebaseException` codes `unavailable` /
+> `deadline-exceeded`) are filtered out so offline retries don't spam toasts;
+> only permanent rejections surface. Tested in
+> `test/state/app_state_error_test.dart`; design recorded in `docs/backend.md`.
+> The original plan below is retained for historical context.
 
 ## Context
 

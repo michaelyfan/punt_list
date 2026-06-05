@@ -29,8 +29,12 @@ class PuntApp extends StatefulWidget {
 }
 
 class _PuntAppState extends State<PuntApp> {
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   AppState _appState = AppState();
   String? _userId;
+  DateTime? _lastErrorShownAt;
 
   void _initForUser(String uid) {
     if (_userId == uid) return;
@@ -38,11 +42,29 @@ class _PuntAppState extends State<PuntApp> {
 
     _appState.dispose();
     _appState = AppState();
+    _appState.onError = _handleWriteError;
 
     final firestore = FirestoreService(uid);
     _appState.init(firestore).then((_) {
       if (mounted) setState(() {});
     });
+  }
+
+  /// Surface a permanent Firestore write failure. Generic, non-actionable
+  /// errors aren't worth leaking details for, so the message is fixed.
+  /// Debounced to ~4s so a burst of failed writes shows one SnackBar, not many.
+  void _handleWriteError(Object error) {
+    final now = DateTime.now();
+    if (_lastErrorShownAt != null &&
+        now.difference(_lastErrorShownAt!) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastErrorShownAt = now;
+    _messengerKey.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text("Couldn't save your changes. They may not be synced."),
+      ),
+    );
   }
 
   void _update(VoidCallback fn) {
@@ -59,6 +81,7 @@ class _PuntAppState extends State<PuntApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'PuntList',
+      scaffoldMessengerKey: _messengerKey,
       themeMode: _appState.themeMode,
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),

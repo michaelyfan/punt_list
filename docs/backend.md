@@ -43,6 +43,12 @@ Flutter App
 - **Firestore SDK** queues writes and retries automatically, including offline. Disk-backed queue persists across app restarts.
 - **Real-time sync**: Not in v1. Data loads from Firestore on app start; cross-device sync happens via cache on next launch.
 
+### Write-failure surfacing
+
+Writes stay fire-and-forget, but their futures are no longer silently dropped. `AppState` wraps each `_firestore?.…` call in `_report(Future?)`, which attaches a `catchError`. Permanent failures (e.g. `permission-denied`, invalid data) are forwarded to a public `AppState.onError` callback that `main.dart` wires to a global `ScaffoldMessenger`, showing a generic, debounced (~4s) SnackBar.
+
+**Offline is not a failure.** With offline persistence on, queued writes' futures stay *pending* until the server acknowledges — they neither resolve nor reject while offline, so they never trigger `onError`. As a defensive belt-and-suspenders, `_report` also explicitly filters out `FirebaseException`s with code `unavailable` / `deadline-exceeded` (transient network), so a flaky connection can't spam error toasts. Only genuine, terminal rejections surface to the user. The message is intentionally generic — Firestore errors aren't user-actionable beyond "retry / check connection", and we don't want to leak rule details.
+
 ## Firestore Data Model
 
 ```
