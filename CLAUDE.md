@@ -179,11 +179,10 @@ See [`docs/backend.md`](docs/backend.md) for rationale (why Firebase/Firestore, 
 - [x] Lists view: "X completed" subtitle isn't helpful — replace it with a preview (of the list's items). `ListCard` subtitle now shows the active (unchecked) item texts joined by " · " on a single ellipsized line; falls back to "No items" (empty list) or "All done" (everything checked). Tested in `lists_screen_test.dart`.
 - [ ] Keyboard flash between items — pressing Enter on an item to create the next one makes the keyboard quickly close and reopen; keep it open
 - [ ] Remove the trash icon — Backspace on an empty item should delete it instead. if you press backspace and you're at the beginning of the text but the item still has characters, it gets prepended to the previous item. Does not apply to parents of sub-lists.
-- [ ] Punt button is too bright, loud, and big — tone it down (color/size)
+- [x] Punt button is too bright, loud, and big — tone it down (color/size). Removed the filled primary-color circle; the move arrow is now a borderless `IconButton` (`iconSize: 20`, `VisualDensity.compact`) tinted with `colorScheme.primary` at 0.6 alpha. Icon unchanged (`Icons.arrow_forward`) so existing visibility tests still match. In `item_tile.dart`.
 - [ ] Change the official app name (as shown in the phone's app menu) to "Punt List"
 - [x] Add "Uncheck all items" to the three-dot menu. `AppState.uncheckAllItems` clears `isChecked` on all items and fires a surgical `batchUpdateItems` (no reorder — order is unchanged); wired into the `ListViewScreen` popup menu (no confirm dialog, since it's non-destructive). Tested in `list_view_screen_test.dart`.
 - [ ] enable or validate Google sign in
-- [ ] pressing enter after an item creates a new item after it, which is expected. however, pressing 
 - [ ] document and/or code-consolidate all our logic related to enter/backspace on items (both as root items and as sublists)
 
 ### Docs / Process

@@ -205,11 +205,10 @@ class _ItemTileState extends State<ItemTile> {
         if (widget.showMoveButton && !isChecked && !isGhost)
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              shape: const CircleBorder(),
-            ),
+            iconSize: 20,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Move',
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
             onPressed: () {
               bool ok = true;
               widget.update(() {
