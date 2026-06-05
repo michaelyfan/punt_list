@@ -72,7 +72,12 @@ files by responsibility:
 zero-width-space sentinel (`ItemTile.editStartSentinel`) to the controller and
 keeps the caret after it. A Backspace at the logical start deletes the
 sentinel; `_onControllerChanged` notices the buffer no longer starts with it
-and calls `onBackspaceAtStart`. This is the **only reliable cross-platform
+and calls `onBackspaceAtStart`. To avoid a false positive, it only treats the
+sentinel's disappearance as a backspace when the edit removed *exactly* the
+leading sentinel and left the rest of the buffer untouched (compared against
+`_lastBufferText`); any other edit that drops the sentinel — select-all then
+type/delete, paste over a full selection — re-anchors the sentinel at the front
+and preserves the user's input instead. This is the **only reliable cross-platform
 signal** — on mobile soft keyboards Backspace arrives as a text delta, not a
 `KeyEvent`, so observing key events (the old `Focus.onKeyEvent` approach) would
 not fire on Android/iOS. The sentinel is never persisted: `_logicalText` strips

@@ -88,6 +88,13 @@ class _ItemTileState extends State<ItemTile> {
   /// buffer) so `_onControllerChanged` doesn't treat them as user edits.
   bool _mutatingBuffer = false;
 
+  /// The buffer text as of the previous change, used to classify the latest
+  /// edit. A genuine Backspace-at-start removes *only* the leading sentinel and
+  /// leaves the rest of the buffer identical; comparing against this lets us
+  /// tell that apart from edits that merely happen to drop the sentinel (e.g.
+  /// select-all then type/delete), which must not be misread as a backspace.
+  String _lastBufferText = '';
+
   /// Whether this tile uses the zero-width-space sentinel for Backspace-at-start
   /// detection. Only when a handler is wired (the real app); isolated widget
   /// tests that don't pass `onBackspaceAtStart` edit plain text.
@@ -129,15 +136,31 @@ class _ItemTileState extends State<ItemTile> {
   void _onControllerChanged() {
     if (_mutatingBuffer || !_isEditing || !_usesSentinel) return;
     final text = _controller.text;
+    final previous = _lastBufferText;
+    _lastBufferText = text;
+
     if (text.startsWith(ItemTile.editStartSentinel)) return; // sentinel intact
 
     if (text.contains(ItemTile.editStartSentinel)) {
       // The user typed *before* the sentinel (caret at absolute 0). Pull the
       // sentinel back to the front so start-detection keeps working.
       _renormalizeBuffer();
-    } else {
-      // Sentinel was deleted → Backspace at the logical start of the text.
+      return;
+    }
+
+    // The sentinel is gone. Only treat this as Backspace-at-start when the edit
+    // deleted *exactly* the leading sentinel and left the rest of the buffer
+    // intact. Any other edit that removed it (select-all then type or delete,
+    // a paste over a full selection, etc.) would otherwise be misread as a
+    // backspace and discard the user's input.
+    final wasBackspaceAtStart = previous.startsWith(ItemTile.editStartSentinel) &&
+        text == previous.substring(ItemTile.editStartSentinel.length);
+    if (wasBackspaceAtStart) {
       _handleBackspaceAtStart();
+    } else {
+      // Some other edit dropped the sentinel — re-anchor it at the front,
+      // preserving the new content and the user's caret.
+      _setBuffer(text, _controller.selection.baseOffset);
     }
   }
 
@@ -196,6 +219,7 @@ class _ItemTileState extends State<ItemTile> {
         selection: TextSelection.collapsed(offset: offset),
       );
     }
+    _lastBufferText = _controller.text;
     _mutatingBuffer = false;
   }
 

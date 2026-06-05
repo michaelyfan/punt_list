@@ -195,6 +195,43 @@ void main() {
       expect(splitAfter, 'World');
     });
 
+    testWidgets('select-all then replace is not misread as backspace-at-start',
+        (tester) async {
+      // Selecting the whole field (which includes the leading sentinel) and
+      // typing a replacement removes the sentinel without it being a Backspace.
+      // It must NOT fire onBackspaceAtStart; the typed text must survive and the
+      // sentinel must be re-anchored so detection keeps working.
+      var backspaceCalls = 0;
+
+      await tester.pumpWidget(buildTile(
+        itemId: 'item-1',
+        text: 'Hello',
+        autoFocus: true,
+        onBackspaceAtStart: (_) {
+          backspaceCalls++;
+          return true;
+        },
+      ));
+      await tester.pumpAndSettle();
+
+      final controller =
+          tester.widget<TextField>(find.byType(TextField)).controller!;
+      expect(controller.text, '${ItemTile.editStartSentinel}Hello');
+
+      // Simulate select-all + type "X": the entire buffer (sentinel included) is
+      // replaced by the single typed character.
+      controller.value = const TextEditingValue(
+        text: 'X',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+
+      expect(backspaceCalls, 0, reason: 'replace is not a backspace-at-start');
+      // Sentinel re-anchored, user input preserved, caret after the typed char.
+      expect(controller.text, '${ItemTile.editStartSentinel}X');
+      expect(controller.selection.baseOffset, 2);
+    });
+
     testWidgets('ghost parent has disabled checkbox', (tester) async {
       await tester.pumpWidget(buildTile(
         itemId: 'ghost-1',
