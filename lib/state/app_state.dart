@@ -375,8 +375,7 @@ class AppState {
     if (itemIndex == -1) return newId;
     final item = list.items[itemIndex];
 
-    list.items[itemIndex] =
-        item.copyWith(text: beforeText.isEmpty ? beforeText : beforeText);
+    list.items[itemIndex] = item.copyWith(text: beforeText);
 
     int insertAt = itemIndex + 1;
     if (item.parentId == null) {
@@ -409,12 +408,11 @@ class AppState {
     _firestore?.deleteItems(listId, deletedIds);
   }
 
-  /// Result of a Backspace-at-start operation in [backspaceAtStart].
-  /// [previousItemId] is the item that should receive focus afterwards (null if
-  /// no operation occurred); [cursorOffset] is where to place the caret in it.
-  /// [merged] is true when text was merged into the previous item.
-
   /// Handles Backspace pressed at offset 0 of an active item's editor.
+  ///
+  /// On success returns a record where [previousItemId] is the item that should
+  /// receive focus afterwards and [cursorOffset] is where to place the caret in
+  /// it; returns null when no operation occurred (see conditions below).
   ///
   /// Behavior (Google-Keep / Notion style):
   /// - If [itemId] has children (is a parent of a sub-list), does nothing and

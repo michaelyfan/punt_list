@@ -38,9 +38,18 @@ list order IS the canonical order. Consequences:
 ## Character-limit gating
 
 `addItem`, `addItems`, `editItemText`, and `moveItem` return `bool` — false
-means the limit would be exceeded and nothing was changed. `splitItem` is
-exempt (text-preserving). Callers in screens/widgets check the bool and show a
-SnackBar.
+means the limit would be exceeded and nothing was changed. `splitItem` and
+`backspaceAtStart` are exempt (text-preserving). Callers in screens/widgets
+check the bool and show a SnackBar.
+
+## Enter-split / Backspace delete-merge
+
+`splitItem` and `backspaceAtStart` are the model-side halves of inline-edit
+key handling. They mutate `items` and return the info the screen needs to move
+focus (`splitItem` → new item id; `backspaceAtStart` → previous item id +
+caret offset, or null for no-op including the parent-with-children exemption).
+The end-to-end flow across tile / state / screen is documented in one place in
+`../widgets/CLAUDE.md` ("Enter / Backspace item editing").
 
 ## Punt = atomic cross-list write
 

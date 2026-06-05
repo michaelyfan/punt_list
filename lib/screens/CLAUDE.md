@@ -18,8 +18,11 @@ limit was hit. Capture the `ScaffoldMessenger` before any `await` to avoid
 
 ## ListViewScreen specifics
 
-- `_autoFocusItemId` is set after `splitItem` so the newly created item's
-  `ItemTile` enters edit mode with focus on next build.
+- `_autoFocusItemId` is set after `splitItem` (and `backspaceAtStart`) so the
+  target item's `ItemTile` enters edit mode with focus on next build. The full
+  Enter-split / Backspace delete-merge flow — including the shared
+  `_editFocusNode` and `_autoFocusCursorOffset` — is documented in one place in
+  `../widgets/CLAUDE.md` ("Enter / Backspace item editing").
 - The reorderable list operates on `activeDisplayItems` indices. Translation
   back to flat-list positions happens in `AppState.reorderItem` — don't try
   to do it here.
