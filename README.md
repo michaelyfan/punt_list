@@ -2,6 +2,8 @@
 
 A list app that lets you move items between lists with one tap. Built with Flutter and Firebase.
 
+I started this because I really need this functionality for frequent travel packing, and it's actually pretty impossible to find this elsewhere.
+
 ## Prerequisites
 
 - [Flutter](https://docs.flutter.dev/get-started/install) installed
